@@ -198,7 +198,9 @@ BDOS:	.WORD	$+2
 	exx
 	push	bc		;/ save ip
 	exx
+#if 0
 	CALL	BDOSS		;return value in A
+#endif
 	exx
 	pop	bc		;restore ip
 	exx
