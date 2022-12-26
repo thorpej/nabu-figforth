@@ -155,7 +155,7 @@ TIBINI:	.WORD	0		;/ INIT (TIB)
 ;	W	DE	sometimes output from
 ;			NEXT, may be altered
 ;			b4 JP'ing to NEXT,
-;			input only when 
+;			input only when
 ;			"DPUSH" called.
 ;	SP	SP	should be used only as
 ;			Data Stack accross
@@ -596,8 +596,8 @@ GCMOV	.WORD	$+2
 	LD	A,B
 	OR	C		; BC=0?
 	JR	Z,EXCMOV	; YES, DON'T MOVE ANYTHING
-	LDDR			; REVERSE XFER STRING 
-	JR	EXCMOV	; 
+	LDDR			; REVERSE XFER STRING
+	JR	EXCMOV	;
 ;
 	.BYTE	82H		;U*   16*16 unsigned multiply
 	.BYTE	'U'		;994 T cycles average (8080)
@@ -836,7 +836,7 @@ TOR:	.WORD	$+2
 	POP	DE
 	LD	HL,(RPP)
 	DEC	HL
-	LD	(HL),D		
+	LD	(HL),D
 	DEC	HL
 	LD	(HL),E		;/ (R1)<--(DE)
 	LD	(RPP),HL	;  (RP)<--(RP)
@@ -2099,7 +2099,7 @@ PDOTQ:	.WORD	DOCOL
 ;
 	.BYTE	0C2H		;."
 	.BYTE	'.'
-	.BYTE	$A0
+	.BYTE	$A2
 	.WORD	PDOTQ-7
 DOTQ:	.WORD	DOCOL
 	.WORD	LIT
@@ -3509,13 +3509,13 @@ CASE:	.WORD	DOCOL
 	.BYTE	')'+$80
 	.WORD	CASE-7
 POF:	.WORD	$+2
-	POP	HL 
+	POP	HL
 	POP	DE
 	OR	A
-	SBC	HL,DE 
-	LD	A,L 		
+	SBC	HL,DE
+	LD	A,L
 	OR	H
- 	JP	NZ,POF1	
+ 	JP	NZ,POF1
 	INC	BC
 	INC	BC
 	JP	(IX)
@@ -3524,7 +3524,7 @@ POF1:	PUSH	DE
 ;
 	.BYTE	0C2H		;OF
 	.BYTE	'O'
-	.BYTE	'F'+$80	
+	.BYTE	'F'+$80
 	.WORD	POF-7
 OFF:	.WORD	DOCOL
 	.WORD	LIT

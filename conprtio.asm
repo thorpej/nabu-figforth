@@ -108,11 +108,55 @@ init_vdp:
         pop     af
         ret
 
+scroll_up:
+        push    bc
+        push    de
+        ld      c, VDP_DATA
+        ld      a, (scroll_first)
+        ld      d, a
+        ld      a, (scroll_last)
+        ld      e, a
+        inc     e
+scroll_up_loop:
+        ld      a, d
+        inc     a
+        call    get_row_address
+        call    vram_set_read_address
+        ld      hl, scroll_buf
+        ld      a, (width)
+        ld      b, a
+        inir
+        ld      a, d
+        call    get_row_address
+        call    vram_set_write_address
+        ld      hl, scroll_buf
+        ld      a, (width)
+        ld      b, a
+        otir
+        inc     d
+        ld      a, d
+        cp      e
+        jr      nz, scroll_up_loop
+        dec     a
+        call    get_row_address
+        call    vram_set_write_address
+        ld      a, (width)
+        ld      b, a
+        ld      a, ' '
+clear_bottom_loop:
+        out     (c), a
+        dec     b
+        jr      nz, clear_bottom_loop
+        pop     de
+        pop     bc
+        ret
+
+
 ;;; debugging
 delay:
         push    hl
         ld      hl, 8000h
-delay_loop:     
+delay_loop:
         dec     l
         jr      nz, delay_loop
         dec     h
@@ -120,57 +164,33 @@ delay_loop:
         pop     hl
         ret
 
-row:    .db     0
-col:    .db     0
-width:  .db     40
-
-        .ORG ($ + 0FFH) & 0FF00H                            ; .align  256
-row_offsets:
-        .dw     VDP_PAGE_BASE
-        .dw     VDP_PAGE_BASE+40
-        .dw     VDP_PAGE_BASE+80
-        .dw     VDP_PAGE_BASE+120
-        .dw     VDP_PAGE_BASE+160
-        .dw     VDP_PAGE_BASE+200
-        .dw     VDP_PAGE_BASE+240
-        .dw     VDP_PAGE_BASE+280
-        .dw     VDP_PAGE_BASE+320
-        .dw     VDP_PAGE_BASE+360
-        .dw     VDP_PAGE_BASE+400
-        .dw     VDP_PAGE_BASE+440
-        .dw     VDP_PAGE_BASE+480
-        .dw     VDP_PAGE_BASE+520
-        .dw     VDP_PAGE_BASE+560
-        .dw     VDP_PAGE_BASE+600
-        .dw     VDP_PAGE_BASE+640
-        .dw     VDP_PAGE_BASE+680
-        .dw     VDP_PAGE_BASE+720
-        .dw     VDP_PAGE_BASE+760
-        .dw     VDP_PAGE_BASE+800
-        .dw     VDP_PAGE_BASE+840
-        .dw     VDP_PAGE_BASE+880
-        .dw     VDP_PAGE_BASE+1020
-
-;;; Set VRAM write address to cursor position
-vdp_set_cursor_address:
-        ld      a, (row)
+;;; Get row address in VRAM, A=>row number, returns VRAM address in HL
+get_row_address:
+        push    bc
         sla     a
-        ld      b, row_offsets/256
+        ld      b, row_addresses/256
         ld      c, a
         ld      a, (bc)
         ld      l, a
         inc     c
         ld      a, (bc)
         ld      h, a
+        pop     bc
+        ret
+
+;;; Set VRAM write address to cursor position
+vdp_set_cursor_address:
+        ld      a, (row)
+        call    get_row_address
         ld      a, (col)
         add     a, l
         ld      l, a
         jr      nc, set_address
         inc     h
-set_address:    
+set_address:
         call    vram_set_write_address
         ret
-        
+
 COUT:
 CPOUT:
         ld      a, e
@@ -179,7 +199,7 @@ CPOUT:
         and     080h                                        ; check if bit 7 is set
         jr      z, printable_character                      ; if not set, printable
         ret                                                 ; 8 bit characters not printed for now
-control_character:      
+control_character:
         ld      a, e
         cp      ACR
         jr      nz, check_lf
@@ -192,7 +212,7 @@ check_lf:
         ld      a, (row)
         cp      VDP_TEXT_ROWS-1
         jr      nz, next_line
-        ;; scroll
+        call    scroll_up
         ret
 next_line:
         inc     a
@@ -207,14 +227,12 @@ bs:
         cp      0
         jr      nz, do_bs
         ret
-do_bs:  
+do_bs:
         dec     a
         ld      (col), a
         ret
-printable_character:    
-        push    bc
+printable_character:
         call    vdp_set_cursor_address
-        pop     bc
         ld      a, e
         out     (VDP_DATA), a
         ld      a, (col)
@@ -223,7 +241,14 @@ printable_character:
         cp      (hl)
         jr      nz, same_line
         ld      hl, row
+        ld      a, (scroll_last)
+        cp      (hl)
+        jr      z, wraparound_scroll
         inc     (hl)
+        xor     a
+        jr      same_line
+wraparound_scroll:
+        call    scroll_up
         xor     a
 same_line:
         ld      (col), a
@@ -277,6 +302,40 @@ PCR:	LD	E,ACR
 	CALL	CPOUT		;and LF
 	JNEXT
 ;
-;
-;
+        .ORG ($ + 0FFH) & 0FF00H                            ; .align  256
+row_addresses:
+        .dw     VDP_PAGE_BASE
+        .dw     VDP_PAGE_BASE+40
+        .dw     VDP_PAGE_BASE+80
+        .dw     VDP_PAGE_BASE+120
+        .dw     VDP_PAGE_BASE+160
+        .dw     VDP_PAGE_BASE+200
+        .dw     VDP_PAGE_BASE+240
+        .dw     VDP_PAGE_BASE+280
+        .dw     VDP_PAGE_BASE+320
+        .dw     VDP_PAGE_BASE+360
+        .dw     VDP_PAGE_BASE+400
+        .dw     VDP_PAGE_BASE+440
+        .dw     VDP_PAGE_BASE+480
+        .dw     VDP_PAGE_BASE+520
+        .dw     VDP_PAGE_BASE+560
+        .dw     VDP_PAGE_BASE+600
+        .dw     VDP_PAGE_BASE+640
+        .dw     VDP_PAGE_BASE+680
+        .dw     VDP_PAGE_BASE+720
+        .dw     VDP_PAGE_BASE+760
+        .dw     VDP_PAGE_BASE+800
+        .dw     VDP_PAGE_BASE+840
+        .dw     VDP_PAGE_BASE+880
+        .dw     VDP_PAGE_BASE+1020
+row:    .db     0
+col:    .db     0
+width:  .db     40
+scroll_first:
+        .db     0
+scroll_last:
+        .db     VDP_TEXT_ROWS-1
+scroll_buf:
+        .dw     80
+
 #include "font.inc"

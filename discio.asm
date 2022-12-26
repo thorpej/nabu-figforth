@@ -308,7 +308,7 @@ FOPEN	.WORD	DOCOL			; user number. A true flag indicates failure.
 FTYPE	.WORD	DOCON,DEFFT
 DEFFT	.TEXT	"FTH"			; default file type
 ;
-	.BYTE	84H			; FILE used in the form 
+	.BYTE	84H			; FILE used in the form
 	.TEXT	"FIL"			;     FILE cccc
 	.BYTE	'E'+$80			; Closes the current file and attempts
 	.WORD	FTYPE-08H		; to open the file with the given name.
@@ -321,11 +321,11 @@ FILE:	.WORD	DOCOL			; The file type is determined by FTYPE.
 	.WORD	FCB			; clear FCB
 	.WORD	LIT,10H
 	.WORD	ZERO
-	.WORD	FILL			
+	.WORD	FILL
 	.WORD	BL,WORD			; get filename
 	.WORD	HERE
 	.WORD	COUNT
-	.WORD	LIT,MAXLEN	
+	.WORD	LIT,MAXLEN
 	.WORD	MIN			; truncate filename if required
 	.WORD	FCB
 	.WORD	ONEP
@@ -342,7 +342,7 @@ FILE:	.WORD	DOCOL			; The file type is determined by FTYPE.
 	.WORD	CMOVE
 	.WORD	FOPEN
 	.WORD	LIT,8
-	.WORD	QERR	
+	.WORD	QERR
 	.WORD	SEMIS
 ;
 	.BYTE	84H			;LOAD

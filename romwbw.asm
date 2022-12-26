@@ -26,10 +26,10 @@ CURCON		.EQU	80H	; 'current console' unit number
 	.BYTE	84H		; KEY? ( -- c t ¦ f )
 	.TEXT	"KEY"		; Check if a key has been pressed. Returns false
 	.BYTE	'?'+$80		; if no key has been pressed. If a key has been
-	.WORD	ARROW-6		; pressed, returns true and the key's ascii code. 
+	.WORD	ARROW-6		; pressed, returns true and the key's ascii code.
 KEYQ:	.WORD	$+2
 	PUSH	BC
-	LD	C,CURCON	
+	LD	C,CURCON
 	LD	B,CIOIST
 	HBIOS
 	OR	A
@@ -43,15 +43,15 @@ KEYQ1:	LD	C,CURCON
 	POP	BC
 	LD	HL,0
 	OR	A
-	JR	NZ,KEYQ2 
+	JR	NZ,KEYQ2
 	LD	L,1
 	LD	D,0
 	PUSH	DE
 KEYQ2:	JHPUSH
 ;
 	.BYTE	84H		; TIME ( -- addr )
-	.TEXT	"TIM"		; Get the RTC time and leave the address of the 
-	.BYTE	'E'+$80		; 6 byte date/time buffer, YMDHMS. Each byte is 
+	.TEXT	"TIM"		; Get the RTC time and leave the address of the
+	.BYTE	'E'+$80		; 6 byte date/time buffer, YMDHMS. Each byte is
 	.WORD	KEYQ-7		; BCD encoded.
 TIME:	.WORD	$+2
 	PUSH	BC
@@ -85,7 +85,7 @@ CLS:	.WORD	$+2
 	LD	B,VDARES
 	HBIOS
 	POP	BC
-	JNEXT		
+	JNEXT
 ;
 	.BYTE	82H		; AT ( col row -- )
 	.BYTE	'A'		; Positions the text cursor at the given position.
@@ -111,10 +111,10 @@ SETPOS:	.WORD	$+2		; Note that AT does *not* update OUT.
 	.WORD	SETPOS-5
 BCD:	.WORD	DOCOL
 	.WORD	DUP
-	.WORD	TWOSLA	
-	.WORD	TWOSLA	
-	.WORD	TWOSLA	
-	.WORD	TWOSLA	
+	.WORD	TWOSLA
+	.WORD	TWOSLA
+	.WORD	TWOSLA
+	.WORD	TWOSLA
 	.WORD	LIT,30H
 	.WORD	PLUS
 	.WORD	EMIT
