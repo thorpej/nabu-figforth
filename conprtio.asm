@@ -16,29 +16,35 @@ EPRINT:	.BYTE	0		;printer flag
 
 ;;; set VDP register, A => value, L => register
 vdp_set_register:
+        di
         out     (VDP_STATUS), a
         ld      a, l
         or      80h
         out     (VDP_STATUS), a
+        ei
         ret
 
 ;;; set VRAM write address, HL => address
 vram_set_write_address:
         ld      a, l
+        di
         out     (VDP_STATUS), a
         ld      a, h
         and     3fh
         or      40h
         out     (VDP_STATUS), a
+        ei
         ret
 
 ;;; set VRAM read address, HL => address
 vram_set_read_address:
         ld      a, l
+        di
         out     (VDP_STATUS), a
         ld      a, h
         and     3fh
         out     (VDP_STATUS), a
+        ei
         ret
 
 ;;; clear VRAM
@@ -151,6 +157,30 @@ clear_bottom_loop:
         pop     bc
         ret
 
+clear_screen:
+        push    bc
+        ld      c, 0                                        ; row counter
+row_loop:
+        ld      a, c
+        cp      VDP_TEXT_ROWS
+        jr      z, clear_screen_done
+        inc     c
+        call    get_row_address
+        call    vram_set_write_address
+        ld      b, 0                                        ; column counter
+col_loop:
+        ld      a, ' '
+        out     (VDP_DATA), a
+        inc     b
+        ld      a, (width)
+        cp      b
+        jr      nz, col_loop
+        jr      row_loop
+clear_screen_done:
+        ld      a, 0
+        ld      (row), a
+        ld      (col), a
+        pop     bc
 
 ;;; debugging
 delay:
@@ -249,11 +279,16 @@ control_character:
         ret
 check_lf:
         cp      LF
-        jr      nz, check_bs
+        jr      nz, check_ff
         ld      a, (row)
         cp      VDP_TEXT_ROWS-1
         jr      nz, next_line
         call    scroll_up
+        ret
+check_ff:
+        cp      FF
+        jr      nz, check_bs
+        call    clear_screen
         ret
 next_line:
         inc     a
