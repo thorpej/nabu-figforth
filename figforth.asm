@@ -55,6 +55,9 @@
 ; ----------------------------------------------------------------------
 ; Added CASE statement as proposed by Charles Eaker, FD II/3, 37-40 - DT
 ; ----------------------------------------------------------------------
+; NABU PC version by Hans Hübner (hans.huebner@gmail.com), DEC 2022
+; https://github.com/hanshuebner/nabu-figforth
+; ----------------------------------------------------------------------
 ;
 ;	Release & Version numbers
 ;
@@ -73,6 +76,7 @@ ACR	.EQU	0DH		;CR
 ADOT	.EQU	2EH		;.
 BELL	.EQU	07H		;^G
 BSIN	.EQU	08H		;backspace chr = ^H
+DELIN   .EQU    7FH             ;DEL character
 BSOUT	.EQU	08H
 DLE	.EQU	10H		;^P
 LF	.EQU	0AH		;^J
@@ -123,7 +127,7 @@ ORIG:	NOP
 ;
 ;
 	.WORD	TASK-7		;  TOPMOST WORD IN FORTH VOCABULARY
-	.WORD	BSIN		;  BACKSPACE CHR
+	.WORD	DELIN		;  BACKSPACE CHR
 UPINIT:	.WORD	0		;/ INIT (UP)
 ;
 ; * FOLLOWING USED BY COLD; MUST BE IN SAME ORDER AS USER VARIABLES *
