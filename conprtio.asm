@@ -257,20 +257,19 @@ same_line:
 ;	FORTH to NABU PC console interface
 ;
 PQTER:	LD	HL,0
-	in      a, (KEYBOARD_STATUS)
-        and     KEYBOARD_RXRDY
+        ld      a, (last_char)
+        cp      0
 	JR	Z,PQTE1		;NO
 	INC	L		;YES, (S1)<--TRUE
 PQTE1:	JHPUSH
 ;
         ;; Ctrl-P toggles the printer on and off
-PKEY:   in      a, (KEYBOARD_STATUS)
-        and     KEYBOARD_RXRDY
+PKEY:   ld      a, (last_char)
+        cp      0
 	JR	Z,PKEY		;NO
-        in      a, (KEYBOARD_DATA)
 	LD	E,A
-        and     80h
-        jr      nz, PKEY
+        xor     a
+        ld      (last_char), a
         ld      a, e
 	CP	DLE		;^P?
 	JR	NZ,PKEY1	;NO

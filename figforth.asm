@@ -2805,7 +2805,7 @@ CLD:	LD	HL,0ffffh
 	LD	BC,CLD1
 	LD	IX,NEXT		; POINTER TO NEXT
 	LD	IY,HPUSH	; POINTER TO HPUSH
-        call    init_vdp
+        call    init_nabu
 	JNEXT
 ;
 CLD1:	.WORD	COLD
@@ -3277,6 +3277,8 @@ PTSTO:	.WORD	$+2
         .EJECT
 #INCLUDE "nabu.asm"
 	.EJECT
+#INCLUDE "irq.asm"
+        .EJECT
 #INCLUDE "conprtio.asm"
 	.EJECT
 #INCLUDE "discio.asm"
