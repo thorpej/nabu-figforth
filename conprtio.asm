@@ -100,7 +100,7 @@ init_vdp:
         ld      a, 0F0H                                     ; colors: white on black
         call    vdp_set_register
 
-        call    vdp_set_cursor_address
+        call    vdp_set_cursor_write_address
 
         pop     hl
         pop     de
@@ -179,16 +179,57 @@ get_row_address:
         ret
 
 ;;; Set VRAM write address to cursor position
-vdp_set_cursor_address:
+vdp_set_cursor_write_address:
         ld      a, (row)
         call    get_row_address
         ld      a, (col)
         add     a, l
         ld      l, a
-        jr      nc, set_address
+        jr      nc, set_write_address
         inc     h
-set_address:
+set_write_address:
         call    vram_set_write_address
+        ret
+
+;;; Set VRAM read address to cursor position
+vdp_set_cursor_read_address:
+        ld      a, (row)
+        call    get_row_address
+        ld      a, (col)
+        add     a, l
+        ld      l, a
+        jr      nc, set_read_address
+        inc     h
+set_read_address:
+        call    vram_set_read_address
+        ret
+
+hide_cursor:
+        push    af
+        di
+        call    vdp_set_cursor_write_address
+        in      a, (char_under_cursor)
+        out     (VDP_DATA), a
+        ei
+        pop     af
+        ret
+
+show_cursor:
+        push    af
+        di
+        call    vdp_set_cursor_read_address
+        in      a, (VDP_DATA)
+        ld      (char_under_cursor), a
+        call    vdp_set_cursor_write_address
+        ld      a, (vdp_count)
+        bit     5, a
+        ld      a, 32
+        jr      z, show_cursor_done
+        ld      a, 7FH
+show_cursor_done:
+        out     (VDP_DATA), a
+        ei
+        pop     af
         ret
 
 COUT:
@@ -232,9 +273,11 @@ do_bs:
         ld      (col), a
         ret
 printable_character:
-        call    vdp_set_cursor_address
+        di
+        call    vdp_set_cursor_write_address
         ld      a, e
         out     (VDP_DATA), a
+        ei
         ld      a, (col)
         inc     a
         ld      hl, width
@@ -264,7 +307,8 @@ PQTER:	LD	HL,0
 PQTE1:	JHPUSH
 ;
         ;; Ctrl-P toggles the printer on and off
-PKEY:   ld      a, (last_char)
+PKEY:   call    show_cursor
+        ld      a, (last_char)
         cp      0
 	JR	Z,PKEY		;NO
 	LD	E,A
@@ -278,9 +322,10 @@ PKEY:   ld      a, (last_char)
 	LD	A,(HL)
 	XOR	01H		;TOGGLE (EPRINT) LSB
 	LD	(HL),A
-PKEY1:	LD	L,E
+PKEY1:	call    hide_cursor
+	LD	L,E
 	LD	H,0
-	JHPUSH			;(S1)LB<--CHR
+        JHPUSH			;(S1)LB<--CHR
 ;
 PEMIT:	.WORD	$+2		;(EMIT) orphan
 	POP	DE		;(E)<--(S1)LB = CHR
@@ -327,9 +372,14 @@ row_addresses:
         .dw     VDP_PAGE_BASE+840
         .dw     VDP_PAGE_BASE+880
         .dw     VDP_PAGE_BASE+1020
-row:    .db     0
-col:    .db     0
-width:  .db     40
+row:
+        .db     0
+col:
+        .db     0
+char_under_cursor:
+        .db     0
+width:
+        .db     40
 scroll_first:
         .db     0
 scroll_last:
