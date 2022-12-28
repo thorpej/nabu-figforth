@@ -144,9 +144,10 @@ BLOC1:	.WORD	FROMR,DROP
 	.BYTE	'W'+$80
 	.WORD	BLOCK-8
 RSLW:	.WORD	$+2
-DORSLW: pop     af
+DORSLW: pop     hl
+        ld      a, l
         cp      0
-        jr      nz, put_request
+        jr      z, put_request
 
 get_request:
         pop     hl
@@ -193,7 +194,9 @@ wait_put_finished:
         ld      a, (hcca_receive_busy)
         cp      0
         jr      nz, wait_put_finished
-        JNEXT
+        ld      h, 0
+        ld      l, (storage_put_status_code)
+        JHPUSH
 
 enable_transmit_and_receive:
         di
@@ -240,10 +243,40 @@ storage_put_status_code:
         .dw     0
 
 ;
+        .byte   83H                                         ;URL
+        .text   "UR"
+        .byte   'L'+$80
+        .WORD   RSLW-6
+URL:    .WORD	$+2
+        ld      hl, storage_http_get_request
+        ld      (hcca_transmit_pointer), hl
+        ld      hl, storage_http_get_request_length
+        ld      (hcca_transmit_count), hl
+        ld      hl, storage_put_status_code
+        ld      (hcca_receive_pointer), hl
+        ld      hl, 1
+        ld      (hcca_receive_count), hl
+        call    enable_transmit_and_receive
+wait_http_get_finished:
+        ld      a, (hcca_receive_busy)
+        cp      0
+        jr      nz, wait_put_finished
+        ld      h, 0
+        ld      l, (storage_put_status_code)
+        JHPUSH
+
+storage_http_get_request:
+        .byte   0a3h
+        .byte   0                                           ;index
+        .byte   storage_http_get_request_length-3           ;length
+        .text   "https://vaxbusters.org/nabu-forth-startup.fth"
+storage_http_get_request_length:        .equ    $-storage_http_get_request
+
+;;; 
 	.BYTE	85H		;FLUSH
 	.TEXT	"FLUS"
 	.BYTE	'H'+$80
-	.WORD	RSLW-6
+	.WORD	URL-6
 FLUSH:	.WORD	DOCOL
 	.WORD	NOBUF,ONEP
 	.WORD	ZERO,XDO
