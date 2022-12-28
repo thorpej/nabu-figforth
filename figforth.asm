@@ -84,9 +84,8 @@ FF	.EQU	0CH		;^L
 ;
 ;	Memory allocation
 ;
-BDOSS	.EQU	0005H		;/ system entry
 NSCR	.EQU	4		;  # of 1024 byte screens
-KBBUF	.EQU	128		;  bytes/disc buffer
+KBBUF	.EQU	1024		;  bytes/disc buffer
 US	.EQU	40H		;  user variables space
 RTS	.EQU	400H		;  Return Stack & term buff space
 CO	.EQU	KBBUF+4		;  Disc buff + 2 header + 2 tail
@@ -2785,8 +2784,7 @@ WARM:	.WORD	DOCOL
 	.WORD	MTBUF
 	.WORD	ABORT
 ;
-CLD:	LD	HL,0ffffh
-	LD	L,0		;/ (HL)<--FBASE
+CLD:	LD	HL,0FF00h
 	LD	(LIMIT+2),HL	;/ set LIMIT
 	LD	DE,BUFSIZ	;/ (DE)<--total disc buffer size
 	OR	A		;/ clr carry
@@ -2820,8 +2818,6 @@ CLD1:	.WORD	COLD
 	.WORD	WARM-7
 COLD:	.WORD	DOCOL
 	.WORD	MTBUF
-	.WORD	ONE,RECADR	;AvdH
-	.WORD	STORE
 	.WORD	LIT,BUF1
 	.WORD	AT		;/
 	.WORD	USE,STORE
@@ -2851,7 +2847,8 @@ COLD:	.WORD	DOCOL
 	.WORD	LIT
 	.WORD	FORTH+6
 	.WORD	STORE
-CLD2:	.WORD	ABORT
+        .WORD   PAG
+	.WORD	ABORT
 ;
 	.BYTE	84H		;S->D
 	.TEXT	"S->"
@@ -3273,9 +3270,13 @@ PTSTO:	.WORD	$+2
         .EJECT
 #INCLUDE "conprtio.asm"
 	.EJECT
+#if 1
 #INCLUDE "discio.asm"
 	.EJECT
 PREVNFA	.EQU	ARROW-6
+#else
+PREVNFA	.EQU	PTSTO-5
+#endif
 ;
 	.BYTE	0C1H		; ' (tick)
 	.BYTE	0A7H

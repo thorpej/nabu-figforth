@@ -1,58 +1,12 @@
 ;  CP/M DISC INTERFACE
 ;
-; Last update:
-;
-; 201212 - added FILE
-; 881228 - EXTEND's R/W address now initialized with blanks
-; 860120 - EXTEND's R/W address now HERE, was Osborne video ram
-; 850511 - saved BC' in 'BDOS'
-; 850227 - saved index regs. in 'BDOS'
-; 840812 - added EXTEND
-; 840731 - installed BDOS calls
-;
-;
-; CP/M BDOS CALLS USED (as per Albert van der Horst, HCCH)
-;
-; R/W reads or writes a sector in the file specified when invoking
-; Z80 fig-FORTH (A>Z80FORTH d:filename.ext), using the default FCB.
-; More than one disc may be accessed by temporary use of a user de-
-; fined FCB.
-;
-;
-;
-DEFFCB	.EQU	005CH		;default FCB
-;
-;	CP/M FUNCTIONS
-;
-OPNFIL	.EQU	0FH		;open file
-CLSFIL	.EQU	10H		;close file
-SETDMA	.EQU	1AH		;set DMA address
-WRTRND	.EQU	22H		;write random
-;
-MAXLEN	.EQU	08H		;max filename length
-FTLEN	.EQU	03H		;filetype length
 ;
 ;	FORTH variables & constants used in disc interface
-;
-	.BYTE	83H		;FCB (current FCB address)
-	.TEXT	"FC"
-	.BYTE	'B'+$80
-	.WORD	PTSTO-5
-FCB:	.WORD	DOCON,DEFFCB
-;
-	.BYTE	84H		;REC# (returns address of random rec.#)
-	.TEXT	"REC"
-	.BYTE	'#'+$80
-	.WORD	FCB-6
-RECADR:	.WORD	DOCOL,FCB
-	.WORD	LIT,21H
-	.WORD	PLUS
-	.WORD	SEMIS
 ;
 	.BYTE	83H		;USE
 	.TEXT	"US"
 	.BYTE	'E'+$80
-	.WORD	RECADR-7
+	.WORD	PTSTO-5
 USE:	.WORD	DOVAR,0		;/ initialised by CLD
 ;
 	.BYTE	84H		;PREV
@@ -185,49 +139,106 @@ BLOC3:	.WORD	DUP,AT
 BLOC1:	.WORD	FROMR,DROP
 	.WORD	TWOP,SEMIS
 ;
-	.BYTE	84H		;BDOS  (CP/M function call)
-	.TEXT	"BDO"
-	.BYTE	'S'+$80
-	.WORD	BLOCK-8
-BDOS:	.WORD	$+2
-	EXX			;SAVE IP
-	POP	BC		;(C) <-- (S1)LB = CP/M function code
-	POP	DE		;(DE) <-- (S2)  = parameter
-	push	ix		;/
-	push	iy		;/
-	exx
-	push	bc		;/ save ip
-	exx
-#if 0
-	CALL	BDOSS		;return value in A
-#endif
-	exx
-	pop	bc		;restore ip
-	exx
-	pop	iy		;/
-	pop	ix		;/
-	EXX			;restore IP
-	LD	L,A
-	LD	H,00H
-	JHPUSH			;(S1) <-- (HL) = returned value
-;
-	.BYTE	83H		;R/W
+	.BYTE	83H		;R/W ( addr block# write -- ) ( 0 == write )
 	.TEXT	"R/"
 	.BYTE	'W'+$80
-	.WORD	BDOS-07H
-RSLW:	.WORD	DOCOL
-	.WORD	TOR		;store R/W flag
-	.WORD	RECADR,STORE
-	.WORD	ZERO,RECADR	;set record #
-	.WORD	TWOP,CSTOR
-	.WORD	LIT,SETDMA
-	.WORD	BDOS,DROP	;set DMA address
-	.WORD	LIT,WRTRND
-	.WORD	FROMR,SUBB	;select READ or WRITE
-	.WORD	FCB,SWAP
-	.WORD	BDOS		;do it
-	.WORD	DSKERR,STORE	;store return code
-	.WORD	SEMIS
+	.WORD	BLOCK-8
+RSLW:	.WORD	$+2
+DORSLW: pop     af
+        cp      0
+        jr      nz, put_request
+
+get_request:
+        pop     hl
+        call    block_number_to_offset
+        ld      (storage_get_offset), hl
+        ld      hl, storage_get_request
+        ld      (hcca_transmit_pointer), hl
+        ld      hl, storage_get_request_length
+        ld      (hcca_transmit_count), hl
+        pop     hl
+        ld      (hcca_receive_pointer), hl
+        ld      hl, KBBUF
+        ld      (hcca_receive_count), hl
+        call    enable_transmit_and_receive
+wait_get_finished:
+        ld      a, (hcca_receive_busy)
+        cp      0
+        jr      nz, wait_get_finished
+        JNEXT
+
+put_request:
+        pop     hl
+        call    block_number_to_offset
+        ld      (storage_put_offset), hl
+        ld      hl, storage_put_request
+        ld      (hcca_transmit_pointer), hl
+        ld      hl, storage_put_request_length
+        ld      (hcca_transmit_count), hl
+        ld      hl, storage_put_status_code
+        ld      (hcca_receive_pointer), hl
+        ld      hl, 1
+        ld      (hcca_receive_count), hl
+        call    enable_transmit_and_receive
+wait_put_send_request_finished:
+        ld      a, (hcca_transmit_busy)
+        cp      0
+        jr      nz, wait_put_send_request_finished
+        pop     hl
+        ld      (hcca_transmit_pointer), hl
+        ld      hl, KBBUF
+        ld      (hcca_transmit_count), hl
+        call    enable_transmit_and_receive
+wait_put_finished:
+        ld      a, (hcca_receive_busy)
+        cp      0
+        jr      nz, wait_put_finished
+        JNEXT
+
+enable_transmit_and_receive:
+        di
+        ld      a, 1
+        ld      (hcca_transmit_busy), a
+        ld      (hcca_receive_busy), a
+        ld      a, PSG_REG_IO_A
+        out     (PSG_ADDRESS), a
+        in      a, (PSG_DATA)
+        or      INT_MASK_HCCATINT + INT_MASK_HCCARINT
+        out     (PSG_DATA), a
+        ei
+
+
+;;; convert block number to offset, HL => block-number, returns offset in HL
+block_number_to_offset:
+        sla     l
+        sla     l
+        ld      h, l
+        ld      l, 0
+        ret
+
+storage_get_request:
+        .byte   0a5h
+storage_get_index:
+        .byte   0
+storage_get_offset:
+        .dw     0
+storage_get_length:
+        .dw     KBBUF
+storage_get_request_length: .equ    $-storage_get_request
+
+storage_put_request:
+        .byte   0a6h
+storage_put_index:
+        .byte   0
+storage_put_offset:
+        .dw     0
+storage_put_length:
+        .dw     KBBUF
+storage_put_request_length: .equ    $-storage_put_request
+
+storage_put_status_code:
+        .dw     0
+
 ;
 	.BYTE	85H		;FLUSH
 	.TEXT	"FLUS"
@@ -242,113 +253,10 @@ FLUS1:	.WORD	ZERO,BUFFE
 	.WORD	FLUS1-$
 	.WORD	SEMIS
 ;
-	.BYTE	86h			;/ EXTEND
-	.TEXT	"EXTEN"
-	.BYTE	'D'+$80
-	.WORD	FLUSH-08h
-EXTEND:
-	.WORD	DOCOL
-	.WORD	HERE			;/ fill with b/buf blanks
-	.WORD	BBUF
-	.WORD	BLANK
-	.WORD	LIT
-	.WORD	0008h
-	.WORD	STAR
-	.WORD	ZERO
-EXTND1:
-	.WORD	ONEP			; begin
-	.WORD	HERE			;/ was lit,f000h (Osborne video ram)
-	.WORD	OVER
-	.WORD	ONE
-	.WORD	RSLW
-	.WORD	DSKERR
-	.WORD	AT
-	.WORD	ZBRAN
-	.WORD	EXTND1-$		; until
-	.WORD	SWAP
-	.WORD	OVER
-	.WORD	PLUS
-	.WORD	SWAP
-	.WORD	XDO			; do
-EXTND2:
-	.WORD	HERE			;/ was lit,f000h (Osborne video ram)
-	.WORD	IDO
-	.WORD	ZERO
-	.WORD	RSLW
-	.WORD	XLOOP
-	.WORD	EXTND2-$		; loop
-	.WORD	FCB
-	.WORD	LIT
-	.WORD	CLSFIL
-	.WORD	BDOS			; close file
-	.WORD	DROP			; discard return code
-	.WORD	FOPEN
-	.WORD	DROP
-	.WORD	SEMIS
-;
-	.WORD	85H
-	.TEXT	"FOPE"			; FOPEN ( --- f )
-	.BYTE	'N'+$80			; Opens a file that currently exists in the
-	.WORD	EXTEND-9		; disk directory for the currently active
-FOPEN	.WORD	DOCOL			; user number. A true flag indicates failure.
-	.WORD	FCB
-	.WORD	LIT,OPNFIL		; open file
-	.WORD	BDOS
-	.WORD	LIT,0FFH		; check for error
-	.WORD	EQUAL
-	.WORD	DUP
-	.WORD	ZEQU
-	.WORD	WARN,STORE		; set WARNING variable
-	.WORD	SEMIS
-;
-	.BYTE	85H
-	.TEXT	"FTYP"			; FTYPE ( --- addr )
-	.BYTE	'E'+$80			; Returns address of file type used
-	.WORD	FOPEN-8			; with FILE.
-FTYPE	.WORD	DOCON,DEFFT
-DEFFT	.TEXT	"FTH"			; default file type
-;
-	.BYTE	84H			; FILE used in the form
-	.TEXT	"FIL"			;     FILE cccc
-	.BYTE	'E'+$80			; Closes the current file and attempts
-	.WORD	FTYPE-08H		; to open the file with the given name.
-FILE:	.WORD	DOCOL			; The file type is determined by FTYPE.
-	.WORD	FCB
-	.WORD	LIT,CLSFIL		; close existing file
-	.WORD	BDOS
-	.WORD	DROP
-	.WORD	MTBUF			; clear buffer
-	.WORD	FCB			; clear FCB
-	.WORD	LIT,10H
-	.WORD	ZERO
-	.WORD	FILL
-	.WORD	BL,WORD			; get filename
-	.WORD	HERE
-	.WORD	COUNT
-	.WORD	LIT,MAXLEN
-	.WORD	MIN			; truncate filename if required
-	.WORD	FCB
-	.WORD	ONEP
-	.WORD	DUP
-	.WORD	LIT,MAXLEN
-	.WORD	BLANK			; blank filename in fcb
-	.WORD	FTYPE
-	.WORD	OVER
-	.WORD	LIT,MAXLEN
-	.WORD	PLUS
-	.WORD	LIT,FTLEN
-	.WORD	CMOVE			; set file type
-	.WORD	SWAP
-	.WORD	CMOVE
-	.WORD	FOPEN
-	.WORD	LIT,8
-	.WORD	QERR
-	.WORD	SEMIS
-;
 	.BYTE	84H			;LOAD
 	.TEXT	"LOA"
 	.BYTE	'D'+$80
-	.WORD	FILE-07H
+	.WORD	FLUSH-08h
 LOAD:	.WORD	DOCOL,BLK
 	.WORD	AT,TOR
 	.WORD	INN,AT

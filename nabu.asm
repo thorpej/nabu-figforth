@@ -40,6 +40,8 @@ VDP_PAGE_BASE     .EQU 1000H
 VDP_TEXT_ROWS     .EQU 23
 
 init_nabu:
+        ld      a, 1                                     ; disable ROM
+        out     (CONTROL_REGISTER), a
         ld      a, 0
         call    set_interrupt_mask
         call    init_vdp

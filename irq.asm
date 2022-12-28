@@ -25,49 +25,35 @@ set_interrupt_mask:
 ;;; Get current interrupt mask, returns mask in A
 get_interrupt_mask:
         di
-        push    af
         ld      a, PSG_REG_IO_A
         out     (PSG_ADDRESS), a
-        pop     af
         in      a, (PSG_DATA)
         ei
         ret
 
-;;; HCCA receiver - Receives characters until a newline character is
-;;; read.  The newline character is not included in the receive
-;;; buffer.  To start receiving, _hcca_receive_pointer needs to be
-;;; pointed to the start of the receive buffer, _hcca_receive_max
-;;; needs point at the last character of the buffer and the HCCA
-;;; receive interrupt needs to be enabled.  When a message has been
-;;; read, the HCCA receive interrupt is disabled and needs to be
-;;; re-enabled to read the next message.
+;;; HCCA receiver - Receives a fixed-length message.  To start
+;;; receiving, hcca_receive_pointer needs to point to the start of the
+;;; receive buffer, hcca_receive_count needs to contain the number of
+;;; bytes to read and the HCCA receive interrupt needs to be enabled.
+;;; When a message has been read, the HCCA receive interrupt is
+;;; disabled and needs to be re-enabled to receive the next message.
 hccar_irq:
         push    af
         push    hl
         ld      hl, (hcca_receive_pointer)
         in      a, (HCCA_REGISTER)
         ld      (hl), a
-        cp      LF
-        ;; save flags during increment + terminate buffer op
-        push    af
-        inc     l
-        jr      nz, skip_receive_h
-        inc     h
-skip_receive_h:
+        inc     hl
         ld      (hcca_receive_pointer), hl
-        ;; zero-terminate receive buffer
-        push    af
-        xor     a
-        ld      (hl), a
-        pop     af
-        ;; restore saved flags from newline comparison
-        pop     af
-        jr      z, end_of_received_message
-        ld      bc, (hcca_receive_max)
-        and     a                                           ; clear carry
-        sbc     hl, bc
-        jr      nz, count_receive
-end_of_received_message:
+        ld      hl, (hcca_receive_count)
+        dec     hl
+        ld      a, h
+        or      l
+        jr      z, end_of_receive
+        ld      (hcca_receive_count), hl
+        jr      z, end_of_receive
+        jr      count_receive
+end_of_receive:
         ;; end of message, switch off the HCCA RX interrupt
         ld      a, PSG_REG_IO_A
         out     (PSG_ADDRESS), a
@@ -78,27 +64,35 @@ end_of_received_message:
         out     (PSG_ADDRESS), a
         pop     af
         out     (PSG_DATA), a
+        ld      a, 0
+        ld      (hcca_receive_busy), a
 count_receive:
         ld      hl, hccar_count
         jp      increment_counter
 
-;;; HCCA transmitter.  To transmit, the _hcca_send_pointer needs to
-;;; point to the start of the message.  The message ends with a zero
-;;; character, which is not transmitted.
+;;; HCCA transmitter.  To transmit, the hcca_transmit_pointer needs to
+;;; point to the start of the message, hcca_transmit_count needs to
+;;; contain the number of bytes to transmit and the HCCA transmit
+;;; interrupt needs to be enabled.  Once the message has been sent,
+;;; the HCCA transmit interrupt will be disabled and needs to be
+;;; re-enabled to transmit the next message.
 hccat_irq:
         push    af
         push    hl
-        ld      hl, (hcca_send_pointer)
+        ld      hl, (hcca_transmit_pointer)
         ld      a, (hl)
         out     (HCCA_REGISTER), a
-        inc     l
-        jr      nz, skip_send_h
-        inc     h
-skip_send_h:
-        ld      (hcca_send_pointer), hl
-        ld      a, (hl)
-        or      a
-        jr      nz, increment_hccat_counter
+        inc     hl
+        ld      (hcca_transmit_pointer), hl
+        ld      hl, (hcca_transmit_count)
+        dec     hl
+        ld      a, h
+        or      l
+        jr      z, end_of_transmit
+        ld      (hcca_transmit_count), hl
+        jr      z, end_of_transmit
+        jr      count_transmit
+end_of_transmit:
         ;; end of message, switch off the HCCA TX interrupt
         ld      a, PSG_REG_IO_A
         out     (PSG_ADDRESS), a
@@ -109,7 +103,9 @@ skip_send_h:
         out     (PSG_ADDRESS), a
         pop     af
         out     (PSG_DATA), a
-increment_hccat_counter:
+        ld      a, 0
+        ld      (hcca_transmit_busy), a
+count_transmit:
         ld      hl, hccat_count
         jp      increment_counter
 
@@ -187,17 +183,38 @@ irq_table:
         .dw      option3_irq
 
 ;;; Each interrupt is counted and can be read from the user program
-hccar_count: .dw 0
-hccat_count: .dw 0
-keyb_count: .dw 0
-vdp_count: .dw 0
-option0_count: .dw 0
-option1_count: .dw 0
-option2_count: .dw 0
-option3_count: .dw 0
+irq_counters:
+hccar_count:
+        .dw     0
+hccat_count:
+        .dw     0
+keyb_count:
+        .dw     0
+vdp_count:
+        .dw     0
+option0_count:
+        .dw     0
+option1_count:
+        .dw     0
+option2_count:
+        .dw     0
+option3_count:
+        .dw     0
 
 ;;; Keyboard and HCCA variables
-last_char: .dw 0
-hcca_send_pointer: .dw 0
-hcca_receive_pointer: .dw 0
-hcca_receive_max: .dw 0
+last_char:
+        .dw     0
+
+hcca_receive_pointer:
+        .dw     0
+hcca_receive_count:
+        .dw     0
+hcca_receive_busy:
+        .byte   0
+
+hcca_transmit_pointer:
+        .dw     0
+hcca_transmit_count:
+        .dw     0
+hcca_transmit_busy:
+        .byte   0
