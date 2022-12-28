@@ -2862,7 +2862,7 @@ COLD:	.WORD	DOCOL
 	.WORD	PDOTQ
 	.BYTE	7
 	.TEXT	"No File"
-	.WORD	BYE
+
 CLD2:	.WORD	ABORT
 ;
 	.BYTE	84H		;S->D
@@ -3785,23 +3785,10 @@ VLIS2:	.WORD	DUP
 	.WORD	DROP
 	.WORD	SEMIS
 ;
-	.BYTE	83H		;BYE
-	.TEXT	"BY"
-	.BYTE	'E'+$80
-	.WORD	VLIST-8
-BYE:	.WORD	DOCOL		;/A
-	.WORD	FLUSH		;/A
-	.WORD	FCB,LIT		;/E
-	.WORD	10H,BDOS	;/E close file
-	.WORD	DROP		;/E discard directory code
-	.WORD	ZERO,ZERO	;/A
-	.WORD	BDOS		;/A return to CP/M
-	.WORD	SEMIS		;/A won't get this far, just for pretty
-;
 	.BYTE	84H	; PAGE		1.3
 	.TEXT	"PAG"
 	.BYTE	'E'+$80
-	.WORD	BYE-6
+	.WORD	VLIST-8
 PAG	.WORD	DOCOL
 	.WORD	LIT,FF
 	.WORD	EMIT,CR
