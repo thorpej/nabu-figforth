@@ -76,7 +76,7 @@ const codeGenerators = {
     },
     lisp: (stream, definitions) => {
         definitions.forEach(({direction, messageName, fields, messageType}) => {
-            const name = '*NHACP-' + direction + '-' + messageName + '*'
+            const name = '+NHACP-' + direction + '-' + messageName + '+'
             printf(stream, "(defconstant %-33s #x%02x)\n", name, messageType)
         })
     }
