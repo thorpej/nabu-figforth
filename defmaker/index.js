@@ -1,6 +1,7 @@
 
 const marked = require('marked')
 const fs = require('fs')
+const path = require('path')
 const printf = require('printf')
 const trim = (string) => string.replace(/^\s*(.*?)\s*$/, "$1")
 
@@ -58,23 +59,54 @@ const parser = {
         }
     }
 }
-marked.use({ renderer: parser })
-marked.parse(fs.readFileSync(process.argv[2], 'utf-8'))
 
 const codeGenerators = {
-    python: (stream, definitions) => {
+    asm: (stream, definitions) => {
+        const MAX_LABEL_LENGTH = 31
+        const defineAsm = (label, directive, value) => {
+            printf(stream, "%-33s  %-8s  %s\n", label.substring(0, MAX_LABEL_LENGTH) + ':', directive, value)
+        }
+        const makeTypeTagName = (direction, messageName) => 'NHACP_' + direction + '_' + messageName.replace(/-/g, '_',)
+        const parseTypeSize = type => {
+                const match = type.match(/char\[(\d+)\]/)
+                if (match) {
+                    return match[1]
+                }
+                switch (type) {
+                    case 'u8': return 1
+                    case 'u16': return 2
+                    case 'u32': return 4
+                    default: console.log('unknown data type ' + type)
+                }
+
+        }
         definitions.forEach(({ direction, messageName, fields, messageType }) => {
-            const tag = 'NHACP_' + direction + '_' + messageName.replace(/-/g, '_',) + ':'
-            printf(stream, "%-33s .equ 0%02xh\n", tag, messageType)
+            const tag = makeTypeTagName(direction, messageName)
+            defineAsm(tag, '.equ', messageType)
         })
+        definitions.forEach(({ direction, messageName, fields, messageType }) => {
+            printf(stream, "\n;;; %s-%s\n", direction, messageName)
+            const toAsmName = s => s.replace(/-/g, '_').toLowerCase()
+            const blockName = toAsmName(messageName + '_' + direction)
+            defineAsm(blockName, '.byte', makeTypeTagName(direction, messageName))
+            fields.slice(1).forEach(({name, type}) => {
+                if (!type.match(/\*$/)) {
+                    defineAsm(blockName + '.' + toAsmName(name), '.ds', parseTypeSize(type))
+                }
+            })
+            defineAsm(`${blockName}_length`, '.equ', `$ - ${blockName}`)
+        })
+        printf(stream, "\n")
     },
-    assembler: (stream, definitions) => {
+    py: (stream, definitions) => {
         definitions.forEach(({direction, messageName, fields, messageType}) => {
             const tag = 'NHACP_' + direction + '_' + messageName.replace(/-/g, '_',)
             printf(stream, "%-33s = 0x%02x\n", tag, messageType)
         })
     },
     lisp: (stream, definitions) => {
+        printf(stream, "(defpackage :nhacp-defs (:use :cl))\n\n")
+        printf(stream, "(in-package :nhacp-defs)\n\n")
         const makeConstantName = (direction, messageName) => '+NHACP-' + direction + '-' + messageName + '+'
         definitions.forEach(({direction, messageName, fields, messageType}) => {
             printf(stream, "(defconstant %-33s #x%02x)\n", makeConstantName(direction, messageName), messageType)
@@ -118,10 +150,17 @@ const codeGenerators = {
     }
 }
 
-const makeDefinitions = (language, definitions) => {
-    console.log("\nGenerating definitions for", language, "\n")
-    codeGenerators[language](process.stdout, definitions)
+const makeDefinitions = (stream, language, definitions) => {
+    codeGenerators[language](stream, definitions)
 }
-makeDefinitions('python', messageDefinitions)
-makeDefinitions('assembler', messageDefinitions)
-makeDefinitions('lisp', messageDefinitions)
+
+const inputFile = process.argv[2]
+marked.use({ renderer: parser })
+marked.parse(fs.readFileSync(inputFile, 'utf-8'))
+
+for (const [language] of Object.entries(codeGenerators)) {
+    const outputFilename = path.dirname(inputFile) + path.sep + path.basename(inputFile, ".md") + "." + language
+    console.log('Generating', outputFilename)
+    const output = fs.createWriteStream(outputFilename)
+    makeDefinitions(output, language, messageDefinitions)
+}
