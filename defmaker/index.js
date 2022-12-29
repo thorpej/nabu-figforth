@@ -61,22 +61,31 @@ const parser = {
 marked.use({ renderer: parser })
 marked.parse(fs.readFileSync(process.argv[2], 'utf-8'))
 
-const makeAssemblerDefinitions = (stream, prefix, definitions) => {
-    definitions.forEach(({ direction, messageName, fields, messageType }) => {
-        const tag = prefix + direction + '_' + messageName.replace(/-/g, '_',) + ':'
-        printf(stream, "%-33s .equ 0%02xh\n", tag, messageType)
-    })
+const codeGenerators = {
+    python: (stream, definitions) => {
+        definitions.forEach(({ direction, messageName, fields, messageType }) => {
+            const tag = 'NHACP_' + direction + '_' + messageName.replace(/-/g, '_',) + ':'
+            printf(stream, "%-33s .equ 0%02xh\n", tag, messageType)
+        })
+    },
+    assembler: (stream, definitions) => {
+        definitions.forEach(({direction, messageName, fields, messageType}) => {
+            const tag = 'NHACP_' + direction + '_' + messageName.replace(/-/g, '_',)
+            printf(stream, "%-33s = 0x%02x\n", tag, messageType)
+        })
+    },
+    lisp: (stream, definitions) => {
+        definitions.forEach(({direction, messageName, fields, messageType}) => {
+            const name = '*NHACP-' + direction + '-' + messageName + '*'
+            printf(stream, "(defconstant %-33s #x%02x)\n", name, messageType)
+        })
+    }
 }
 
-const makePythonDefinitions = (stream, prefix, definitions) => {
-    definitions.forEach(({ direction, messageName, fields, messageType }) => {
-        const tag = prefix + direction + '_' + messageName.replace(/-/g, '_',)
-        printf(stream, "%-33s = 0x%02x\n", tag, messageType)
-    })
+const makeDefinitions = (language, definitions) => {
+    console.log("\nGenerating definitions for", language, "\n")
+    codeGenerators[language](process.stdout, definitions)
 }
-
-console.log("\nAssembler definitions\n")
-makeAssemblerDefinitions(process.stdout, 'NHACP_', messageDefinitions)
-
-console.log("\nPython definitions\n")
-makePythonDefinitions(process.stdout, 'NHACP_', messageDefinitions)
+makeDefinitions('python', messageDefinitions)
+makeDefinitions('assembler', messageDefinitions)
+makeDefinitions('lisp', messageDefinitions)
