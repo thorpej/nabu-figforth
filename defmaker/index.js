@@ -75,9 +75,45 @@ const codeGenerators = {
         })
     },
     lisp: (stream, definitions) => {
+        const makeConstantName = (direction, messageName) => '+NHACP-' + direction + '-' + messageName + '+'
         definitions.forEach(({direction, messageName, fields, messageType}) => {
-            const name = '+NHACP-' + direction + '-' + messageName + '+'
-            printf(stream, "(defconstant %-33s #x%02x)\n", name, messageType)
+            printf(stream, "(defconstant %-33s #x%02x)\n", makeConstantName(direction, messageName), messageType)
+        })
+        printf(stream, "\n")
+        printf(stream, "(binary-types:define-unsigned u8 1 :little-endian)\n")
+        printf(stream, "(binary-types:define-unsigned u16 2 :little-endian)\n")
+        printf(stream, "(binary-types:define-unsigned u32 4 :little-endian)\n")
+        printf(stream, "\n")
+
+        printf(
+            stream,
+            "(defclass nhacp-message ()\n" +
+            "  ((type-tag :allocation :class :initarg :type-tag)))\n\n")
+
+        definitions.forEach(({direction, messageName, fields, messageType}) => {
+            if (fields.length > 1) {
+                printf(
+                    stream,
+                    "(binary-types:define-binary-class %s-%s (nhacp-message)\n  (",
+                    messageName.toLowerCase(),
+                    direction === 'REQ' ? 'request' : 'response')
+                fields.slice(1).forEach(({name, type}, i) => {
+                    if (!type.match(/\*$/)) {
+                        if (i !== 0) {
+                            printf(stream, "\n   ")
+                        }
+                        const match = type.match(/char\[(\d+)\]/)
+                        if (match) {
+                            const length = match[1]
+                            printf(stream, "(%s :initarg :%s :binary-type (binary-types:define-binary-string nhacp-%s-string %d))", name, name, name, length)
+                        } else {
+                            printf(stream, "(%s :initarg :%s :binary-type %s)", name, name, type)
+                        }
+                    }
+                })
+                printf(stream, ")\n")
+                printf(stream, "  (:default-initargs :type-tag %s))\n\n", makeConstantName(direction, messageName))
+            }
         })
     }
 }
