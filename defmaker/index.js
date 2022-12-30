@@ -67,7 +67,16 @@ const codeGenerators = {
             if (label) {
                 label = label.substring(0, MAX_LABEL_LENGTH) + ':'
             }
-            printf(stream, "%-33s  %-8s  %s\n", label || '', directive, value)
+            printf(stream, "%-33s  %-8s  ", label || '', directive || '')
+            if (typeof value === 'number') {
+                if (value > 255) {
+                    printf(stream, "0%04xh\n", value)
+                } else {
+                    printf(stream, "0%02xh\n", value)
+                }
+            } else {
+                printf(stream, "%s\n", value || '')
+            }
         }
         defineAsm('NHACP_START', '.equ', '0AFH')
         printf(stream, '\n')
@@ -89,15 +98,15 @@ const codeGenerators = {
             const tag = makeTypeTagName(direction, messageName)
             defineAsm(tag, '.equ', messageType)
         })
+        const toAsmName = s => s.replace(/-/g, '_').toLowerCase()
+        // Define message layouts
         let previousDirection
         definitions.forEach(({ direction, messageName, fields, messageType }) => {
-            if (direction !== previousDirection && direction == 'RES') {
+            if (direction !== previousDirection && direction === 'RES') {
                 printf(stream, '\n;;; ---------- Response buffers\n\n')
-                defineAsm('nhacp_first_response_buffer', '', '')
             }
             previousDirection = direction
             printf(stream, "\n;;; %s-%s\n", direction, messageName)
-            const toAsmName = s => s.replace(/-/g, '_').toLowerCase()
             const blockName = toAsmName(messageName + '_' + direction)
             if (direction === 'REQ') {
                 defineAsm(null, '.word', '0')
@@ -112,8 +121,26 @@ const codeGenerators = {
             })
             defineAsm(`${blockName}_length`, '.equ', `$ - ${blockName}`)
         })
+        // Define response message dispatch table
+        printf(stream, '\n;;; ---------- Response message dispatch table\n\n')
+        defineAsm('response_message_dispatch_table')
+        let previousMessageType
+        let maxResponseMessageType
+        definitions.forEach(({ direction, messageName, fields, messageType }) => {
+            if (direction === 'RES') {
+                if (previousMessageType && previousMessageType !== (messageType - 1)) {
+                    console.error('non-consequitive response message', messageName)
+                    process.exit(1)
+                }
+                previousMessageType = messageType
+                const blockName = toAsmName(messageName + '_' + direction)
+                defineAsm(null, '.dw', `${blockName}_length`)
+                defineAsm(null, '.dw', blockName)
+                maxResponseMessageType = messageType
+            }
+        })
+        defineAsm('response_type_count', '.equ', (maxResponseMessageType & 0x7f) + 1)
         printf(stream, "\n")
-        defineAsm(null, '.byte', '0, 0 ;; terminate response definitions')
     },
     py: (stream, definitions) => {
         definitions.forEach(({direction, messageName, fields, messageType}) => {
@@ -123,8 +150,7 @@ const codeGenerators = {
     },
     lisp: (stream, definitions) => {
         printf(stream, ";; generated -*- Lisp -*- code, do not edit\n\n")
-        printf(stream, "(defpackage :nhacp-defs (:use :cl :binary-types))\n\n")
-        printf(stream, "(in-package :nhacp-defs)\n\n")
+        printf(stream, "(in-package :nhacp)\n\n")
         printf(stream, "(defconstant +NHACP-START+ #xAF)\n\n")
         const makeConstantName = (direction, messageName) => '+NHACP-' + direction + '-' + messageName + '+'
         definitions.forEach(({direction, messageName, fields, messageType}) => {

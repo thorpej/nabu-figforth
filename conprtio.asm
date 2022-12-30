@@ -340,6 +340,7 @@ PQTER:	LD	HL,0
 	JR	Z,PQTE1		;NO
 	INC	L		;YES, (S1)<--TRUE
 PQTE1:	JHPUSH
+        
 ;
         ;; Ctrl-P toggles the printer on and off
 PKEY:   call    show_cursor

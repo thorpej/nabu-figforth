@@ -169,12 +169,12 @@ block_number_to_offset:
         ld      l, 0
         ret
 ;
-        .byte   83H                                         ;URL
-        .text   "UR"
-        .byte   'L'+$80
+        .byte   82H                                         ;URL
+        .text   "N"
+        .byte   'R'+$80
         .WORD   RSLW-6
-URL:    .WORD	$+2
-        JNEXT
+NR:     .WORD	$+2
+        jp      nhacp_request
 
 storage_http_get_request:
         .byte   0a3h
@@ -182,12 +182,41 @@ storage_http_get_request:
         .byte   storage_http_get_request_length-3           ;length
         .text   "https://vaxbusters.org/nabu-forth-startup.fth"
 storage_http_get_request_length:        .equ    $-storage_http_get_request
-
+;;;
+        .byte   88h
+        .text   ".ADAPTE"
+        .byte   'R' + $80
+	.WORD	NR-5
+ADAPTER:.WORD   DOCOL
+        .WORD   LIT,adapter_heading
+        .WORD   LIT,adapter_heading_length
+        .WORD   TYPE
+        .WORD   CR
+        .WORD   LIT,nhacp_adapter_id
+        .WORD   LIT,nhacp_started_res.adapter_id_le,CAT
+        .WORD   TYPE
+        .WORD   CR
+        .WORD   SEMIS
+adapter_heading:
+        .text   "Connected to network adapter:"
+adapter_heading_length: .equ   $-adapter_heading
+;;;
+        .BYTE   84H
+        .TEXT   "TES"
+        .BYTE   'T'+$80
+        .WORD	ADAPTER-11
+XTEST:  .WORD   DOCOL
+        .WORD   LIT,get_date_time_req
+        .WORD   LIT,1
+        .WORD   LIT,$8000
+        .WORD   LIT,0
+        .WORD   NR
+        .WORD   SEMIS
 ;;; 
 	.BYTE	85H		;FLUSH
 	.TEXT	"FLUS"
 	.BYTE	'H'+$80
-	.WORD	URL-6
+	.WORD   XTEST-7
 FLUSH:	.WORD	DOCOL
 	.WORD	NOBUF,ONEP
 	.WORD	ZERO,XDO

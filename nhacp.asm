@@ -46,8 +46,6 @@ nhacp_request:
         ld      c, l
         ld      hl, (nhacp_buf_len)
         add     hl, bc
-        inc     hl
-        inc     hl
         ld      b, h
         ld      c, l
         ;; store in front of req
@@ -78,7 +76,7 @@ nhacp_request_wait:
         cp      0
         jr      nz, nhacp_request_wait
         ld      hl, (nhacp_received_response)
-        ret
+        JHPUSH
 
 enable_hcca_interrupts:
         di
@@ -194,38 +192,37 @@ end_of_segment:
         jr      nz, check_more_data
         ;; we've completely received the frame preamble, determine
         ;; response buffer to use
-        ld      hl, nhacp_first_response_buffer
-check_message_type:
-        ld      a, (hl)                                     ; length of static response buffer
-        cp      0                                           ; last buffer has tag 0, not used for real message
-        jr      z, end_of_receive                           ; response buffer not found
-        ld      b, a                                        ; length of response buffer
         ld      a, (nhacp_frame_type)                       ; frame type received
-        inc     hl
-        cp      (hl)                                        ; compare type tag to buffer
-        jr      z, response_buffer_found
-        add     a, b                                        ; length of buffer checked
-        ld      l, a
-        jr      nc, check_message_type
-        inc     h
-        jr      check_message_type
-response_buffer_found:
-        ld      a, b                                        ; length of response buffer
-        cp      0                                           ; could be zero
-        jr      z, end_of_receive
+        bit     7, a
+        jr      z, receive_error
+        and     07fh
+        cp      response_type_count
+        jr      nc, receive_error
+        sla     a
+        sla     a
+        ld      c, a
+        ld      b, 0
+        ld      hl, response_message_dispatch_table
+        add     hl, bc
+        ld      a, (hl)
         dec     a                                           ; type byte already received
         ld      (hcca_receive_count), a
         xor     a
         ld      (hcca_receive_count+1), a
-        ld      (nhacp_received_response), hl               ; points to response buffer found
-        inc     hl                                          ; type already read
-        ld      (hcca_receive_pointer), hl
+        inc     hl
+        inc     hl
+        ld      c, (hl)
+        inc     hl
+        ld      b, (hl)
+        ld      (nhacp_received_response), bc               ; points to response buffer found
+        inc     bc                                          ; type already read
+        ld      (hcca_receive_pointer), bc
         ;; substract what we've already received from nhacp_frame_length
         ld      bc, (hcca_receive_count)
         inc     bc
         ld      hl, (nhacp_frame_length)
         sbc     hl, bc
-        ld      (nhacp_frame_length), hl
+        ld      (nhacp_frame_length), hl                    ; frame length contains bytes remaining to be read
         jr      count_receive
 check_more_data:
         ld      hl, (nhacp_frame_length)
@@ -238,6 +235,9 @@ check_more_data:
         ld      hl, nhacp_frame_length
         ld      (hl), 0
         jr      count_receive
+receive_error:
+        ld      a, 0ffh
+        out     (CONTROL_REGISTER), a
 end_of_receive:
         ;; end of message, switch off the HCCA RX interrupt
         ld      a, PSG_REG_IO_A
