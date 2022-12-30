@@ -211,6 +211,9 @@ XTEST:  .WORD   DOCOL
         .WORD   LIT,$8000
         .WORD   LIT,0
         .WORD   NR
+        .WORD   LIT,date_time_res+1
+        .WORD   LIT,date_time_res_length-1
+        .WORD   TYPE
         .WORD   SEMIS
 ;;; 
 	.BYTE	85H		;FLUSH
