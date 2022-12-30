@@ -64,8 +64,13 @@ const codeGenerators = {
     asm: (stream, definitions) => {
         const MAX_LABEL_LENGTH = 31
         const defineAsm = (label, directive, value) => {
-            printf(stream, "%-33s  %-8s  %s\n", label.substring(0, MAX_LABEL_LENGTH) + ':', directive, value)
+            if (label) {
+                label = label.substring(0, MAX_LABEL_LENGTH) + ':'
+            }
+            printf(stream, "%-33s  %-8s  %s\n", label || '', directive, value)
         }
+        defineAsm('NHACP_START', '.equ', '0AFH')
+        printf(stream, '\n')
         const makeTypeTagName = (direction, messageName) => 'NHACP_' + direction + '_' + messageName.replace(/-/g, '_',)
         const parseTypeSize = type => {
                 const match = type.match(/char\[(\d+)\]/)
@@ -84,10 +89,21 @@ const codeGenerators = {
             const tag = makeTypeTagName(direction, messageName)
             defineAsm(tag, '.equ', messageType)
         })
+        let previousDirection
         definitions.forEach(({ direction, messageName, fields, messageType }) => {
+            if (direction !== previousDirection && direction == 'RES') {
+                printf(stream, '\n;;; ---------- Response buffers\n\n')
+                defineAsm('nhacp_first_response_buffer', '', '')
+            }
+            previousDirection = direction
             printf(stream, "\n;;; %s-%s\n", direction, messageName)
             const toAsmName = s => s.replace(/-/g, '_').toLowerCase()
             const blockName = toAsmName(messageName + '_' + direction)
+            if (direction === 'REQ') {
+                defineAsm(null, '.word', '0')
+            } else if (direction === 'RES') {
+                defineAsm(null, '.byte', `${blockName}_length`)
+            }
             defineAsm(blockName, '.byte', makeTypeTagName(direction, messageName))
             fields.slice(1).forEach(({name, type}) => {
                 if (!type.match(/\*$/)) {
@@ -97,6 +113,7 @@ const codeGenerators = {
             defineAsm(`${blockName}_length`, '.equ', `$ - ${blockName}`)
         })
         printf(stream, "\n")
+        defineAsm(null, '.byte', '0, 0 ;; terminate response definitions')
     },
     py: (stream, definitions) => {
         definitions.forEach(({direction, messageName, fields, messageType}) => {
@@ -105,16 +122,18 @@ const codeGenerators = {
         })
     },
     lisp: (stream, definitions) => {
-        printf(stream, "(defpackage :nhacp-defs (:use :cl))\n\n")
+        printf(stream, ";; generated -*- Lisp -*- code, do not edit\n\n")
+        printf(stream, "(defpackage :nhacp-defs (:use :cl :binary-types))\n\n")
         printf(stream, "(in-package :nhacp-defs)\n\n")
+        printf(stream, "(defconstant +NHACP-START+ #xAF)\n\n")
         const makeConstantName = (direction, messageName) => '+NHACP-' + direction + '-' + messageName + '+'
         definitions.forEach(({direction, messageName, fields, messageType}) => {
             printf(stream, "(defconstant %-33s #x%02x)\n", makeConstantName(direction, messageName), messageType)
         })
         printf(stream, "\n")
-        printf(stream, "(binary-types:define-unsigned u8 1 :little-endian)\n")
-        printf(stream, "(binary-types:define-unsigned u16 2 :little-endian)\n")
-        printf(stream, "(binary-types:define-unsigned u32 4 :little-endian)\n")
+        printf(stream, "(define-unsigned u8 1 :little-endian)\n")
+        printf(stream, "(define-unsigned u16 2 :little-endian)\n")
+        printf(stream, "(define-unsigned u32 4 :little-endian)\n")
         printf(stream, "\n")
 
         printf(
@@ -126,7 +145,7 @@ const codeGenerators = {
             if (fields.length > 1) {
                 printf(
                     stream,
-                    "(binary-types:define-binary-class %s-%s (nhacp-message)\n  (",
+                    "(define-binary-class %s-%s (nhacp-message)\n  (",
                     messageName.toLowerCase(),
                     direction === 'REQ' ? 'request' : 'response')
                 fields.slice(1).forEach(({name, type}, i) => {
@@ -137,7 +156,7 @@ const codeGenerators = {
                         const match = type.match(/char\[(\d+)\]/)
                         if (match) {
                             const length = match[1]
-                            printf(stream, "(%s :initarg :%s :binary-type (binary-types:define-binary-string nhacp-%s-string %d))", name, name, name, length)
+                            printf(stream, "(%s :initarg :%s :binary-type (define-binary-string nhacp-%s-string %d))", name, name, name, length)
                         } else {
                             printf(stream, "(%s :initarg :%s :binary-type %s)", name, name, type)
                         }

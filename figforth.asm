@@ -2808,6 +2808,7 @@ CLD:	LD	HL,0FF00h
 	LD	IX,NEXT		; POINTER TO NEXT
 	LD	IY,HPUSH	; POINTER TO HPUSH
         call    init_nabu
+        call    nhacp_start
 	JNEXT
 ;
 CLD1:	.WORD	COLD
@@ -3264,19 +3265,17 @@ PTSTO:	.WORD	$+2
 	JNEXT
 ;
         .EJECT
-#INCLUDE "nabu.asm"
+#include "nabu.asm"
 	.EJECT
-#INCLUDE "irq.asm"
+#include "irq.asm"
         .EJECT
-#INCLUDE "conprtio.asm"
+#include "nhacp.asm"
+        .EJECT
+#include "conprtio.asm"
 	.EJECT
-#if 1
-#INCLUDE "discio.asm"
+#include "discio.asm"
 	.EJECT
 PREVNFA	.EQU	ARROW-6
-#else
-PREVNFA	.EQU	PTSTO-5
-#endif
 ;
 	.BYTE	0C1H		; ' (tick)
 	.BYTE	0A7H

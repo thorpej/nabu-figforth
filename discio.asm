@@ -151,65 +151,15 @@ DORSLW: pop     hl
 
 get_request:
         pop     hl
-        call    block_number_to_offset
-        ld      (storage_get_offset), hl
-        ld      hl, storage_get_request
-        ld      (hcca_transmit_pointer), hl
-        ld      hl, storage_get_request_length
-        ld      (hcca_transmit_count), hl
         pop     hl
-        ld      (hcca_receive_pointer), hl
-        ld      hl, KBBUF
-        ld      (hcca_receive_count), hl
-        call    enable_transmit_and_receive
-wait_get_finished:
-        ld      a, (hcca_receive_busy)
-        cp      0
-        jr      nz, wait_get_finished
         JNEXT
 
 put_request:
         pop     hl
-        call    block_number_to_offset
-        ld      (storage_put_offset), hl
-        ld      hl, storage_put_request
-        ld      (hcca_transmit_pointer), hl
-        ld      hl, storage_put_request_length
-        ld      (hcca_transmit_count), hl
-        ld      hl, storage_put_status_code
-        ld      (hcca_receive_pointer), hl
-        ld      hl, 1
-        ld      (hcca_receive_count), hl
-        call    enable_transmit_and_receive
-wait_put_send_request_finished:
-        ld      a, (hcca_transmit_busy)
-        cp      0
-        jr      nz, wait_put_send_request_finished
         pop     hl
-        ld      (hcca_transmit_pointer), hl
-        ld      hl, KBBUF
-        ld      (hcca_transmit_count), hl
-        call    enable_transmit_and_receive
-wait_put_finished:
-        ld      a, (hcca_receive_busy)
-        cp      0
-        jr      nz, wait_put_finished
         ld      h, 0
-        ld      l, (storage_put_status_code)
+        ld      l, 0
         JHPUSH
-
-enable_transmit_and_receive:
-        di
-        ld      a, 1
-        ld      (hcca_transmit_busy), a
-        ld      (hcca_receive_busy), a
-        ld      a, PSG_REG_IO_A
-        out     (PSG_ADDRESS), a
-        in      a, (PSG_DATA)
-        or      INT_MASK_HCCATINT + INT_MASK_HCCARINT
-        out     (PSG_DATA), a
-        ei
-
 
 ;;; convert block number to offset, HL => block-number, returns offset in HL
 block_number_to_offset:
@@ -218,52 +168,13 @@ block_number_to_offset:
         ld      h, l
         ld      l, 0
         ret
-
-storage_get_request:
-        .byte   0a5h
-storage_get_index:
-        .byte   0
-storage_get_offset:
-        .dw     0
-storage_get_length:
-        .dw     KBBUF
-storage_get_request_length: .equ    $-storage_get_request
-
-storage_put_request:
-        .byte   0a6h
-storage_put_index:
-        .byte   0
-storage_put_offset:
-        .dw     0
-storage_put_length:
-        .dw     KBBUF
-storage_put_request_length: .equ    $-storage_put_request
-
-storage_put_status_code:
-        .dw     0
-
 ;
         .byte   83H                                         ;URL
         .text   "UR"
         .byte   'L'+$80
         .WORD   RSLW-6
 URL:    .WORD	$+2
-        ld      hl, storage_http_get_request
-        ld      (hcca_transmit_pointer), hl
-        ld      hl, storage_http_get_request_length
-        ld      (hcca_transmit_count), hl
-        ld      hl, storage_put_status_code
-        ld      (hcca_receive_pointer), hl
-        ld      hl, 1
-        ld      (hcca_receive_count), hl
-        call    enable_transmit_and_receive
-wait_http_get_finished:
-        ld      a, (hcca_receive_busy)
-        cp      0
-        jr      nz, wait_put_finished
-        ld      h, 0
-        ld      l, (storage_put_status_code)
-        JHPUSH
+        JNEXT
 
 storage_http_get_request:
         .byte   0a3h
