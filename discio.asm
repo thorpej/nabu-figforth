@@ -243,7 +243,8 @@ NR:     .word	$+2
         .word   NR-5
 NROPEN: .word   $+2
         pop     hl
-        ld      (storage_open_req.url_length), hl
+        ld      a, l
+        ld      (storage_open_req.url_length), a
         pop     hl
         ld      (adr_tmp), hl
         ld      hl, storage_open_req
@@ -252,7 +253,9 @@ NROPEN: .word   $+2
         push    hl
         ld      hl, (adr_tmp)
         push    hl
-        ld      hl, (storage_open_req_length)
+        ld      a, (storage_open_req.url_length)
+        ld      h, 0
+        ld      l, a
         push    hl
         jp      nhacp_request
 adr_tmp:
@@ -273,7 +276,7 @@ AUTOSTART:
         .word   TYPE
         .word   NROPEN
         .word   CR
-        .word   LIT,1,LOAD
+;        .word   LIT,1,LOAD
         .word   SEMIS
 
 default_url:
