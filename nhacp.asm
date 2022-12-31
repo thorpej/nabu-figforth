@@ -66,6 +66,8 @@ nhacp_request:
         ld      (hcca_receive_pointer), hl
         ld      hl, 3
         ld      (hcca_receive_count), hl
+        ld      a, RECEIVE_STATE_PREAMBLE
+        ld      (nhacp_receive_state), a
         ;; set "busy" flag, enable interrupts and wait for transaction to complete
         ld      a, 1
         ld      (nhacp_busy), a
@@ -76,6 +78,7 @@ nhacp_request_wait:
         cp      0
         jr      nz, nhacp_request_wait
         ld      hl, (nhacp_received_response)
+        dec     hl                                          ; dispatch table points to first data byte, adjust
         JHPUSH
 
 enable_hcca_interrupts:
@@ -177,21 +180,20 @@ hccar_irq:
         ld      (hcca_receive_pointer), hl
         ld      hl, (hcca_receive_count)
         dec     hl
-        ld      a, h
-        or      l
-        jr      z, end_of_segment
         ld      (hcca_receive_count), hl
-        jr      count_receive
-end_of_segment:
-        ;; check whether we've been receiving the frame preamble
-        ld      hl, (hcca_receive_pointer)
-        ld      bc, nhacp_frame_preamble_end
-        sbc     hl, bc
         ld      a, h
         or      l
-        jr      nz, check_more_data
-        ;; we've completely received the frame preamble, determine
-        ;; response buffer to use
+        jr      nz, receive_irq_done
+        ;; end of segment, see what we need to do next
+        ld      a, (nhacp_receive_state)
+        cp      RECEIVE_STATE_HEADER
+        jr      z, maybe_receive_payload
+        cp      RECEIVE_STATE_PAYLOAD
+        jr      z, end_of_receive
+        inc     a
+        ld      (nhacp_receive_state), a
+        ;; we've received the frame preamble, determine response
+        ;; buffer to use
         ld      a, (nhacp_frame_type)                       ; frame type received
         bit     7, a
         jr      z, receive_error
@@ -204,18 +206,13 @@ end_of_segment:
         ld      b, 0
         ld      hl, response_message_dispatch_table
         add     hl, bc
-        ld      a, (hl)
-        dec     a                                           ; type byte already received
+        ld      a, (hl) ; length of message, adjusted by 1 as the type byte was already received
         ld      (hcca_receive_count), a
-        xor     a
-        ld      (hcca_receive_count+1), a
-        inc     hl
         inc     hl
         ld      c, (hl)
         inc     hl
         ld      b, (hl)
         ld      (nhacp_received_response), bc               ; points to response buffer found
-        inc     bc                                          ; type already read
         ld      (hcca_receive_pointer), bc
         ;; substract what we've already received from nhacp_frame_length
         ld      bc, (hcca_receive_count)
@@ -223,8 +220,10 @@ end_of_segment:
         ld      hl, (nhacp_frame_length)
         sbc     hl, bc
         ld      (nhacp_frame_length), hl                    ; frame length contains bytes remaining to be read
-        jr      count_receive
-check_more_data:
+        jr      receive_irq_done
+maybe_receive_payload:
+        inc     a
+        ld      (nhacp_receive_state), a
         ld      hl, (nhacp_frame_length)
         ld      a, l
         or      h
@@ -234,9 +233,9 @@ check_more_data:
         ld      (hcca_receive_pointer), hl
         ld      hl, nhacp_frame_length
         ld      (hl), 0
-        jr      count_receive
+        jr      receive_irq_done
 receive_error:
-        ld      a, 0ffh
+        ld      a, CONTROL_ROMSEL | CONTROL_LED_ALERT | CONTROL_LED_CHECK
         out     (CONTROL_REGISTER), a
 end_of_receive:
         ;; end of message, switch off the HCCA RX interrupt
@@ -251,10 +250,13 @@ end_of_receive:
         out     (PSG_DATA), a
         ld      a, 0
         ld      (nhacp_busy), a
-count_receive:
+receive_irq_done:
         ld      hl, hccar_count
         pop     bc
-        jp      increment_counter
+        pop     hl
+        pop     af
+        ei
+        reti
 
 hcca_receive_pointer:
         .dw     0
@@ -268,6 +270,13 @@ hcca_transmit_count:
 
 nhacp_adapter_id:
         .ds     50
+
+RECEIVE_STATE_PREAMBLE: .equ    0
+RECEIVE_STATE_HEADER:   .equ    1
+RECEIVE_STATE_PAYLOAD:  .equ    2
+
+nhacp_receive_state:
+        .byte   0
 
 ;;; buffer for frame preamble
 nhacp_frame_length:

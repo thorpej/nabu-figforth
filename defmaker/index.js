@@ -134,8 +134,9 @@ const codeGenerators = {
                 }
                 previousMessageType = messageType
                 const blockName = toAsmName(messageName + '_' + direction)
-                defineAsm(null, '.dw', `${blockName}_length`)
-                defineAsm(null, '.dw', blockName)
+                defineAsm(null, '.db', `${blockName}_length - 1`)
+                defineAsm(null, '.dw', `${blockName} + 1`)
+                defineAsm(null, '.db', 0)
                 maxResponseMessageType = messageType
             }
         })
