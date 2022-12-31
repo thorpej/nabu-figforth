@@ -153,6 +153,7 @@ const codeGenerators = {
         printf(stream, ";; generated -*- Lisp -*- code, do not edit\n\n")
         printf(stream, "(in-package :nhacp)\n\n")
         printf(stream, "(defconstant +NHACP-START+ #xAF)\n\n")
+        printf(stream, "(defvar *type-tag-to-name* (make-hash-table))\n\n")
         const makeConstantName = (direction, messageName) => '+NHACP-' + direction + '-' + messageName + '+'
         definitions.forEach(({direction, messageName, fields, messageType}) => {
             printf(stream, "(defconstant %-33s #x%02x)\n", makeConstantName(direction, messageName), messageType)
@@ -169,29 +170,29 @@ const codeGenerators = {
             "  ((type-tag :allocation :class :initarg :type-tag)))\n\n")
 
         definitions.forEach(({direction, messageName, fields, messageType}) => {
-            if (fields.length > 1) {
-                printf(
-                    stream,
-                    "(define-binary-class %s-%s (nhacp-message)\n  (",
-                    messageName.toLowerCase(),
-                    direction === 'REQ' ? 'request' : 'response')
-                fields.slice(1).forEach(({name, type}, i) => {
-                    if (!type.match(/\*$/)) {
-                        if (i !== 0) {
-                            printf(stream, "\n   ")
-                        }
-                        const match = type.match(/char\[(\d+)\]/)
-                        if (match) {
-                            const length = match[1]
-                            printf(stream, "(%s :initarg :%s :binary-type (define-binary-string nhacp-%s-string %d))", name, name, name, length)
-                        } else {
-                            printf(stream, "(%s :initarg :%s :binary-type %s)", name, name, type)
-                        }
+            printf(
+                stream,
+                "(define-binary-class %s-%s (nhacp-message)\n  (",
+                messageName.toLowerCase(),
+                direction === 'REQ' ? 'request' : 'response')
+            fields.slice(1).forEach(({name, type}, i) => {
+                if (!type.match(/\*$/)) {
+                    if (i !== 0) {
+                        printf(stream, "\n   ")
                     }
-                })
-                printf(stream, ")\n")
-                printf(stream, "  (:default-initargs :type-tag %s))\n\n", makeConstantName(direction, messageName))
-            }
+                    const match = type.match(/char\[(\d+)\]/)
+                    if (match) {
+                        const length = match[1]
+                        printf(stream, "(%s :initarg :%s :binary-type (define-binary-string nhacp-%s-string %d))", name, name, name, length)
+                    } else {
+                        printf(stream, "(%s :initarg :%s :binary-type %s)", name, name, type)
+                    }
+                }
+            })
+            const constantName = makeConstantName(direction, messageName)
+            printf(stream, ")\n")
+            printf(stream, "  (:default-initargs :type-tag %s))\n", constantName)
+            printf(stream, '\n(setf (gethash %s *type-tag-to-name*) "%s")\n\n', constantName, direction + '-' + messageName)
         })
     }
 }
