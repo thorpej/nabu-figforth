@@ -79,7 +79,11 @@ nhacp_request_wait:
         jr      nz, nhacp_request_wait
         ld      hl, (nhacp_received_response)
         dec     hl                                          ; dispatch table points to first data byte, adjust
-        JHPUSH
+        ld      (nhacp_response), hl
+        JNEXT
+
+nhacp_response:
+        .ds     2
 
 enable_hcca_interrupts:
         di

@@ -147,56 +147,160 @@ RSLW:	.WORD	$+2
 DORSLW: pop     hl
         ld      a, l
         cp      0
+        ;; save parameters
+        pop     hl
+        ld      (block_number), hl
+        pop     hl
+        ld      (block_address), hl
         jr      z, put_request
 
 get_request:
-        pop     hl
-        pop     hl
-        JNEXT
-
-put_request:
-        pop     hl
-        pop     hl
-        ld      h, 0
-        ld      l, 0
-        JHPUSH
-
-;;; convert block number to offset, HL => block-number, returns offset in HL
-block_number_to_offset:
-        sla     l
-        sla     l
-        ld      h, l
-        ld      l, 0
-        ret
-;
-        .byte   82H                                         ;URL
-        .text   "N"
-        .byte   'R'+$80
-        .WORD   RSLW-6
-NR:     .WORD	$+2
+        ;; set up storage-get request
+        ld      hl, storage_get_req.index
+        ld      (hl), 0                                     ; fixme: should use "current index"
+        ld      hl, KBBUF
+        ld      (storage_get_req.length), hl
+        push    bc
+        ld      bc, (block_number)
+        ld      hl, storage_get_req.offset
+        call    block_number_to_offset
+        pop     bc
+        ;; set up stack for nhacp_request
+        ld      hl, storage_get_req
+        push    hl
+        ld      hl, storage_get_req_length
+        push    hl
+        ld      hl, (block_address)
+        push    hl
+        ld      hl, 0
+        push    hl
         jp      nhacp_request
 
-storage_http_get_request:
-        .byte   0a3h
-        .byte   0                                           ;index
-        .byte   storage_http_get_request_length-3           ;length
-        .text   "https://vaxbusters.org/nabu-forth-startup.fth"
-storage_http_get_request_length:        .equ    $-storage_http_get_request
+put_request:
+        ;; set up storage-put request
+        ld      hl, storage_put_req.index
+        ld      (hl), 0                                     ; fixme: should use "current index"
+        ld      hl, KBBUF
+        ld      (storage_put_req.length), hl
+        push    bc
+        ld      bc, (block_number)
+        ld      hl, storage_put_req.offset
+        call    block_number_to_offset
+        pop     bc
+        ;; set up stack for nhacp_request
+        ld      hl, storage_put_req
+        push    hl
+        ld      hl, storage_put_req_length
+        push    hl
+        ld      hl, (block_address)
+        push    hl
+        ld      hl, KBBUF
+        push    hl
+        jp      nhacp_request
+
+block_number:
+        .ds     2
+block_address:
+        .ds     2
+
+;;; convert block number to offset, BC => block-number, HL => pointer
+;;; to 32 bit offset
+block_number_to_offset:
+        push    hl
+        ld      (hl), 0
+        inc     hl
+        ld      (hl), c
+        inc     hl
+        ld      (hl), b
+        inc     hl
+        ld      (hl), 0
+        pop     hl
+        inc     hl
+        push    hl
+        sla     (hl)
+        inc     hl
+        rl      (hl)
+        inc     hl
+        rl      (hl)
+        pop     hl
+        sla     (hl)
+        inc     hl
+        rl      (hl)
+        inc     hl
+        rl      (hl)
+        ret
+;;;
+        .byte   82H                                         ;NR (nabu request)
+        .text   "N"
+        .byte   'R'+$80
+        .word   RSLW-6
+NR:     .word	$+2
+        jp      nhacp_request
+;;; 
+        .byte   86H
+        .text   "NROPE"
+        .byte   'N'+$80
+        .word   NR-5
+NROPEN: .word   $+2
+        pop     hl
+        ld      (storage_open_req.url_length), hl
+        pop     hl
+        ld      (adr_tmp), hl
+        ld      hl, storage_open_req
+        push    hl
+        ld      hl, storage_open_req_length
+        push    hl
+        ld      hl, (adr_tmp)
+        push    hl
+        ld      hl, (storage_open_req_length)
+        push    hl
+        jp      nhacp_request
+adr_tmp:
+        .ds     2
+;;;
+        .byte   89H
+        .text   "AUTOSTAR"
+        .byte   'T'+$80
+        .word   NROPEN-9
+AUTOSTART:
+        .word   DOCOL
+        .word   LIT,default_url
+        .word   LIT,default_url_length
+        .word   OVER,OVER
+        .word   LIT,loading_msg
+        .word   LIT,loading_msg_len
+        .word   TYPE
+        .word   TYPE
+        .word   NROPEN
+        .word   CR
+;        .word   LIT,1,LOAD
+        .word   SEMIS
+
+default_url:
+        .text   "https://github.com/hanshuebner/nabu-figforth/blob/main/SCREENS.FTH?raw=true"
+default_url_length: .equ    $-default_url
+
+loading_msg:
+        .text   "Loading: "
+loading_msg_len: .equ    $-loading_msg
+
+nhacp_error_buf:
+        .ds     128
 ;;;
         .byte   88h
         .text   ".ADAPTE"
         .byte   'R' + $80
-	.WORD	NR-5
-ADAPTER:.WORD   DOCOL
-        .WORD   LIT,adapter_heading
-        .WORD   LIT,adapter_heading_length
-        .WORD   TYPE
-        .WORD   CR
-        .WORD   LIT,nhacp_adapter_id
-        .WORD   LIT,nhacp_started_res.adapter_id_le,CAT
-        .WORD   TYPE
-        .WORD   CR
-        .WORD   SEMIS
+	.word	AUTOSTART-12
+ADAPTER:.word   DOCOL
+        .word   LIT,adapter_heading
+        .word   LIT,adapter_heading_length
+        .word   TYPE
+        .word   CR
+        .word   LIT,nhacp_adapter_id
+        .word   LIT,nhacp_started_res.adapter_id_le,CAT
+        .word   TYPE
+        .word   CR
+        .word   SEMIS
 adapter_heading:
         .text   "Connected to network adapter:"
 adapter_heading_length: .equ   $-adapter_heading

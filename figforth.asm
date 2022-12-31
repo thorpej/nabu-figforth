@@ -2850,6 +2850,7 @@ COLD:	.WORD	DOCOL
 	.WORD	STORE
         .WORD   PAG
         .WORD   ADAPTER
+        .WORD   AUTOSTART
 	.WORD	ABORT
 ;
 	.BYTE	84H		;S->D
