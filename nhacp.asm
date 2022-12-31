@@ -211,6 +211,8 @@ hccar_irq:
         ld      hl, response_message_dispatch_table
         add     hl, bc
         ld      a, (hl) ; length of message, adjusted by 1 as the type byte was already received
+        cp      0
+        jr      z, end_of_receive
         ld      (hcca_receive_count), a
         inc     hl
         ld      c, (hl)

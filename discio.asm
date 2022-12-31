@@ -267,22 +267,23 @@ AUTOSTART:
         .word   LIT,default_url
         .word   LIT,default_url_length
         .word   OVER,OVER
-        .word   LIT,loading_msg
-        .word   LIT,loading_msg_len
+        .word   LIT,opening_msg
+        .word   LIT,opening_msg_len
         .word   TYPE
         .word   TYPE
         .word   NROPEN
         .word   CR
-;        .word   LIT,1,LOAD
+        .word   LIT,1,LOAD
         .word   SEMIS
 
 default_url:
-        .text   "https://github.com/hanshuebner/nabu-figforth/blob/main/SCREENS.FTH?raw=true"
+        .text   "https://github.com/hanshuebner/nabu-figforth/blob/main/AUTOSTART.FTH?raw=true"
+;        .text   "file:test.txt?autoscreen=true"
 default_url_length: .equ    $-default_url
 
-loading_msg:
-        .text   "Loading: "
-loading_msg_len: .equ    $-loading_msg
+opening_msg:
+        .text   "Opening: "
+opening_msg_len: .equ    $-opening_msg
 
 nhacp_error_buf:
         .ds     128
