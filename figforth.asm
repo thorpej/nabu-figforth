@@ -3265,6 +3265,64 @@ PTSTO:	.WORD	$+2
 	OUT	(C),L
 	EXX			;d RESTORE REGISTERS
 	JNEXT
+;;;
+        .byte   84h                                         ; VDP! ( v r -- ) set VDP register r to v
+        .text   "VDP"
+        .byte   '!' + $80
+        .word   PTSTO-5
+SETVDP: .word   $+2
+        exx
+        pop     hl
+        pop     bc
+        ld      a, c
+        di
+        call    vdp_set_register
+        ei
+        exx
+        JNEXT
+;;;
+        .byte   84h  ; VDP@ ( r -- v ) read VDP register r
+        .text   "VDP"
+        .byte   '@'+$80
+        .word   SETVDP-7
+GETVDP: .word   $+2
+        pop     hl
+        di
+        call    vdp_get_status_register
+        ei
+        ld      l, a
+        ld      h, 0
+        JHPUSH
+;;;
+        .byte   8bh  ; UNLOCK-F18A ( -- ) Unlock F18A features
+        .text   "UNLOCK-F18"
+        .byte   'A'+$80
+        .word   GETVDP-7
+UNLF18A:.word   $+2
+        di
+        call    unlock_f18a
+        ei
+        JNEXT
+;;;
+        .byte   89h  ; LOCK-F18A ( -- ) Unlock F18A features
+        .text   "LOCK-F18"
+        .byte   'A'+$80
+        .word   UNLF18A-14
+LF18A:  .word   $+2
+        di
+        call    lock_f18a
+        ei
+        JNEXT
+;;;
+        .byte   83h                                         ; T80 ( f -- ) 1: 80 chars/line, 0: 40 chars/line
+        .text   "T8"
+        .byte   '0' + $80
+        .word   LF18A-12
+T80:    .word   $ + 2
+        pop     hl
+        ld      a, l
+        call    init_console
+        JNEXT
 ;
         .EJECT
 #include "nabu.asm"
