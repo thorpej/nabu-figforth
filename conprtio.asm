@@ -16,35 +16,39 @@ EPRINT:	.BYTE	0		;printer flag
 
 ;;; set VDP register, A => value, L => register
 vdp_set_register:
-        di
         out     (VDP_STATUS), a
         ld      a, l
         or      80h
         out     (VDP_STATUS), a
-        ei
+        ret
+
+;;; get extended VDP status register, A => status register number,
+;;; returns status register value in A
+vdp_get_status_register:
+        ld      a, l
+        out     (VDP_STATUS), a                             ; status register number
+        ld      a, 8fh                                      ; set SR15
+        out     (VDP_STATUS), a
+        in      a, (VDP_STATUS)                             ; read status register
         ret
 
 ;;; set VRAM write address, HL => address
 vram_set_write_address:
         ld      a, l
-        di
         out     (VDP_STATUS), a
         ld      a, h
         and     3fh
         or      40h
         out     (VDP_STATUS), a
-        ei
         ret
 
 ;;; set VRAM read address, HL => address
 vram_set_read_address:
         ld      a, l
-        di
         out     (VDP_STATUS), a
         ld      a, h
         and     3fh
         out     (VDP_STATUS), a
-        ei
         ret
 
 ;;; clear VRAM
@@ -74,20 +78,76 @@ load_font:
         otir
         ret
 
+unlock_f18a:
+        ld      l, 039h
+        ld      a, 01ch
+        call    vdp_set_register
+        ld      l, 039h
+        ld      a, 01ch
+        call    vdp_set_register
+        ret
+
+lock_f18a:      
+        ld      l, 039h
+        ld      a, 000h
+        call    vdp_set_register
+        ret
+
+detect_f18a:
+        call    unlock_f18a
+        ld      l, 1
+        call    vdp_get_status_register
+        and     0c0h
+        cp      0e0h
+        ld      a, 0
+        jr      nz, store_f18a_flag
+        ld      a, 1
+store_f18a_flag:
+        ld      (has_f18a), a
+        call    lock_f18a
+        ret
+
 ;;; initialize the console
-init_vdp:
-        di
+init_console:
         push    af
         push    bc
         push    de
         push    hl
+
+        cp      0
+        ld      a, 40
+        jr      z, set_width
+        add     a, 40
+set_width:
+        ld      (width), a
+
+        ld      a, 0
+        ld      (row), a
+        ld      (col), a
+
+        ;; save interrupt enable status
+        ld      a, r
+        ld      a, 0
+        jp      po, init_console_di
+        ld      a, 1
+        push    af
+init_console_di:        
+        di
+
+;        call    detect_f18a
+        call    calculate_row_addresses
 
         call    clear_vram
         ld      hl, font_data
         call    load_font
 
         ld      l, 0
+        ld      a, (width)
+        cp      40
         ld      a, 0
+        jr      z, init_vdp_set_r0
+        ld      a, VDP_R0_M4
+init_vdp_set_r0:        
         call    vdp_set_register
 
         ld      l, 1
@@ -108,10 +168,18 @@ init_vdp:
 
         call    vdp_set_cursor_write_address
 
+        ;; restore interrupts
+        pop     af
+        cp      0
+        jr      z, init_console_done
+        ei
+init_console_done:      
+
         pop     hl
         pop     de
         pop     bc
         pop     af
+        ei
         ret
 
 scroll_up:
@@ -206,6 +274,41 @@ get_row_address:
         ld      a, (bc)
         ld      h, a
         pop     bc
+        ret
+
+;;; calculate row addresses for current screen width
+calculate_row_addresses:
+        push    af
+        push    hl
+        push    bc
+        push    de
+        ld      bc, VDP_PAGE_BASE
+        ld      d, 0
+        ld      a, (width)
+        ld      e, a
+        ld      hl, row_addresses
+        ld      a, 0
+loop_calculate_row_addresses:
+        ld      (hl), c
+        inc     hl
+        ld      (hl), b
+        inc     hl
+        inc     a
+        cp      VDP_TEXT_ROWS
+        jr      z, calculate_row_addresses_done
+        push    hl
+        ld      h, b
+        ld      l, c
+        add     hl, de
+        ld      b, h
+        ld      c, l
+        pop     hl
+        jr      loop_calculate_row_addresses
+calculate_row_addresses_done:
+        pop     de
+        pop     bc
+        pop     hl
+        pop     af
         ret
 
 ;;; Set VRAM write address to cursor position
@@ -384,30 +487,7 @@ PCR:	LD	E,ACR
 ;
         .ORG ($ + 0FFH) & 0FF00H                            ; .align  256
 row_addresses:
-        .dw     VDP_PAGE_BASE
-        .dw     VDP_PAGE_BASE+40
-        .dw     VDP_PAGE_BASE+80
-        .dw     VDP_PAGE_BASE+120
-        .dw     VDP_PAGE_BASE+160
-        .dw     VDP_PAGE_BASE+200
-        .dw     VDP_PAGE_BASE+240
-        .dw     VDP_PAGE_BASE+280
-        .dw     VDP_PAGE_BASE+320
-        .dw     VDP_PAGE_BASE+360
-        .dw     VDP_PAGE_BASE+400
-        .dw     VDP_PAGE_BASE+440
-        .dw     VDP_PAGE_BASE+480
-        .dw     VDP_PAGE_BASE+520
-        .dw     VDP_PAGE_BASE+560
-        .dw     VDP_PAGE_BASE+600
-        .dw     VDP_PAGE_BASE+640
-        .dw     VDP_PAGE_BASE+680
-        .dw     VDP_PAGE_BASE+720
-        .dw     VDP_PAGE_BASE+760
-        .dw     VDP_PAGE_BASE+800
-        .dw     VDP_PAGE_BASE+840
-        .dw     VDP_PAGE_BASE+880
-        .dw     VDP_PAGE_BASE+1020
+        .ds     VDP_TEXT_ROWS * 2
 row:
         .db     0
 col:
@@ -415,12 +495,14 @@ col:
 char_under_cursor:
         .db     0
 width:
-        .db     40
+        .db     80
 scroll_first:
         .db     0
 scroll_last:
         .db     VDP_TEXT_ROWS-1
 scroll_buf:
         .dw     80
+has_f18a:
+        .db     0
 
 #include "font.inc"
