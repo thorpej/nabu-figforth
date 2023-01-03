@@ -1,4 +1,4 @@
-;  CP/M DISC INTERFACE
+; NABU virtual disk interface using the NHACP protocol
 ;
 ;
 ;	FORTH variables & constants used in disc interface
@@ -6,7 +6,7 @@
 	.BYTE	83H		;USE
 	.TEXT	"US"
 	.BYTE	'E'+$80
-	.WORD	PTSTO-5
+	.WORD	T80-6
 USE:	.WORD	DOVAR,0		;/ initialised by CLD
 ;
 	.BYTE	84H		;PREV
