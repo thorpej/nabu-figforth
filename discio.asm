@@ -280,8 +280,9 @@ AUTOSTART:
         .word   SEMIS
 
 default_url:
-        .text   "https://github.com/hanshuebner/nabu-figforth/blob/main/AUTOSTART.FTH?raw=true"
+;        .text   "https://github.com/hanshuebner/nabu-figforth/blob/main/AUTOSTART.FTH?raw=true"
 ;        .text   "file:test.txt?autoscreen=true"
+        .text   "AUTOSTART.FTH"
 default_url_length: .equ    $-default_url
 
 opening_msg:

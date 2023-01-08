@@ -3266,10 +3266,18 @@ PTSTO:	.WORD	$+2
 	EXX			;d RESTORE REGISTERS
 	JNEXT
 ;;;
+        .byte   8Eh                                         ; NHACP-RESPONSE ( -- adr ) Return pointer to last NHACP response
+        .text   "NHACP-RESPONS"
+        .byte   'E' + $80
+        .word   PTSTO-5
+NHACPR: .WORD   $+2
+        ld      hl, nhacp_response
+        JHPUSH
+;;; 
         .byte   84h                                         ; VDP! ( v r -- ) set VDP register r to v
         .text   "VDP"
         .byte   '!' + $80
-        .word   PTSTO-5
+        .word   NHACPR-17
 SETVDP: .word   $+2
         exx
         pop     hl
