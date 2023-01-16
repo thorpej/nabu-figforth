@@ -130,6 +130,13 @@ underlying storage (file/URL) should be updated as well.
 
 Possible responses: OK, ERROR
 
+If a write originates at or beyond the underlying storage
+object's end-of-file or therwise crosses the end-of-file,
+then the underlying storage object is implicitly enlarged to
+accommodate the write.  For writes that originate beyond
+end-of-file, the region between the old end-of-file and
+the newly-written region shall be implicitly zero-filled.
+
 ### GET-DATE-TIME
 
 Retrieve the current date and time from the network adapter.
