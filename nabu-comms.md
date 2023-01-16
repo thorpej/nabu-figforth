@@ -96,7 +96,13 @@ Possible responses: STORAGE-LOADED, ERROR
 
 ### STORAGE-GET
 
-Get data from network adapter storage
+Get data from network adapter storage.
+
+N.B. The maximum payload length that can be returned to the caller
+is the maximum message length (32767) _minus_ the size of the
+DATA-BUFFER reply message (3) (32767 - 3 -> 32764 bytes).  Servers
+SHOULD return an error for STORAGE-GET requests whose length field
+exceeds this value.
 
 | Name   | Type | Notes                            |
 |--------|------|----------------------------------|
@@ -110,15 +116,21 @@ Possible responses: DATA-BUFFER, ERROR
 The length returned in the DATA-BUFFER response reflects
 the amount of data actuallty read from the underlying
 storage object.  If the offset is beyond the object's
-end-of-file, then the returned length shall be 0.
+end-of-file, then the returned length MUST be 0.
 If the read operation would cross the object's end-of-file,
-then the length shall be the number of bytes read before
+then the length MUST be the number of bytes read before
 the end-of-file was encountered.
 
 ### STORAGE-PUT
 
 Update data stored in the network adapter.  If possible, the
 underlying storage (file/URL) should be updated as well.
+
+N.B. The maximum payload length that can be sent to the server
+is the maximum message length (32767) _minus_ the size of the
+STORAGE-PUT request message (8) (32767 - 8 -> 32759 bytes).  Servers
+SHOULD return an error for STORAGE-PUT requests whose length field
+exceeds this value.
 
 | Name   | Type | Notes                            |
 |--------|------|----------------------------------|
@@ -132,10 +144,13 @@ Possible responses: OK, ERROR
 
 If a write originates at or beyond the underlying storage
 object's end-of-file or therwise crosses the end-of-file,
-then the underlying storage object is implicitly enlarged to
-accommodate the write.  For writes that originate beyond
-end-of-file, the region between the old end-of-file and
-the newly-written region shall be implicitly zero-filled.
+then the underlying storage object SHOULD be implicitly
+enlarged to accommodate the write.  For writes that originate
+beyond end-of-file, the region between the old end-of-file and
+the newly-written region MUST be implicitly zero-filled.  If
+a server implementation does not support extending the underlying
+storage object, then the server MUST return an error without
+performing the write operation.
 
 ### GET-DATE-TIME
 
