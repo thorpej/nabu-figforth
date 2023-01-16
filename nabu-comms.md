@@ -107,6 +107,14 @@ Get data from network adapter storage
 
 Possible responses: DATA-BUFFER, ERROR
 
+The length returned in the DATA-BUFFER response reflects
+the amount of data actuallty read from the underlying
+storage object.  If the offset is beyond the object's
+end-of-file, then the returned length shall be 0.
+If the read operation would cross the object's end-of-file,
+then the length shall be the number of bytes read before
+the end-of-file was encountered.
+
 ### STORAGE-PUT
 
 Update data stored in the network adapter.  If possible, the
