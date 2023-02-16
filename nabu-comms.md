@@ -91,6 +91,11 @@ explicitly here.
 * Version 0.1
     * Defined the protocol versioning convention.
     * Defined the initial set of error codes.
+    * Rename STORAGE-GET, STORAGE-PUT, and STORAGE-CLOSE to
+      FILE-PREAD, FILE-PWRITE, and FILE-CLOSE, respectively.
+      This is a name change only; the semantics of these message
+      are identical to previous versions.
+    * Use the term "file descriptor" rather than "storage slot".
 * Version 0.0 - Initial version
 
 ## Request messages
@@ -110,30 +115,30 @@ adapter will attempt to allocate a storage slot.  If the requested slot
 is already in-use by another storage object, the STORAGE-OPEN request
 MUST fail.
 
-| Name       | Type  | Notes                                                              |
-|------------|-------|--------------------------------------------------------------------|
-| type       | u8    | 0x01                                                               |
-| index      | u8    | Storage slot to use for response (0xff => Network Adapter selects) |
-| flags      | u16   | Flags to pass to storage handler (TBD)                             |
-| url-length | u8    | Length of resource in bytes                                        |
-| url        | char* | URL String                                                         |
+| Name       | Type  | Notes                                                                      |
+|------------|-------|----------------------------------------------------------------------------|
+| type       | u8    | 0x01                                                                       |
+| index      | u8    | File descriptor slot to use for response (0xff => Network Adapter selects) |
+| flags      | u16   | Flags to pass to storage handler (TBD)                                     |
+| url-length | u8    | Length of resource in bytes                                                |
+| url        | char* | URL String                                                                 |
 
 Possible responses: STORAGE-LOADED, ERROR
 
-### STORAGE-GET
+### FILE-PREAD
 
-Get data from network adapter storage.
+Perform a positional-read of data from network adapter storage.
 
 N.B. The maximum payload length that can be returned to the caller
 is the maximum message length (32767) _minus_ the size of the
 DATA-BUFFER reply message (3) (32767 - 3 -> 32764 bytes).  Servers
-SHOULD return an error for STORAGE-GET requests whose length field
+SHOULD return an error for FILE-PREAD requests whose length field
 exceeds this value.
 
 | Name   | Type | Notes                            |
 |--------|------|----------------------------------|
 | type   | u8   | 0x02                             |
-| index  | u8   | Storage slot to access           |
+| index  | u8   | File descriptor to access        |
 | offset | u32  | Offset into the storage in bytes |
 | length | u16  | Number of bytes to return        |
 
@@ -147,10 +152,11 @@ If the read operation would cross the object's end-of-file,
 then the length MUST be the number of bytes read before
 the end-of-file was encountered.
 
-### STORAGE-PUT
+### FILE-PWRITE
 
-Update data stored in the network adapter.  If possible, the
-underlying storage (file/URL) should be updated as well.
+Perform a positional-write to update data stored in the network
+adapter.  If possible, the underlying storage (file/URL) SHOULD
+be updated as well.
 
 N.B. The maximum payload length that can be sent to the server
 is the maximum message length (32767) _minus_ the size of the
@@ -161,7 +167,7 @@ exceeds this value.
 | Name   | Type | Notes                            |
 |--------|------|----------------------------------|
 | type   | u8   | 0x03                             |
-| index  | u8   | Storage slot to access           |
+| index  | u8   | File descriptor to access        |
 | offset | u32  | Offset into the storage in bytes |
 | length | u16  | Number of bytes to write         |
 | data   | u8*  | Data to update the storage with  |
@@ -188,15 +194,15 @@ Retrieve the current date and time from the network adapter.
 
 Possible responses: DATE-TIME, ERROR
 
-### STORAGE-CLOSE
+### FILE-CLOSE
 
-Close a previously opened storage slot.  Any resources associated with
-it on the network adapter will be freed.
+Close a previously opened file descriptor.  Any resources associated
+with it on the network adapter will be freed.
 
-| Name  | Type | Notes                 |
-|-------|------|-----------------------|
-| type  | u8   | 0x05                  |
-| index | u8   | Storage slot to close |
+| Name  | Type | Notes                    |
+|-------|------|--------------------------|
+| type  | u8   | 0x05                     |
+| index | u8   | File descriptor to close |
 
 No response message is returned by the network adapter.  If the server
 receives a slot that is not currently in use by the client, the request
@@ -283,11 +289,11 @@ All other error codes are reserved.
 
 ### STORAGE-LOADED
 
-| Name   | Type | Notes                                       |
-|--------|------|---------------------------------------------|
-| type   | u8   | 0x83                                        |
-| index  | u8   | Storage index that was provided or selected |
-| length | u32  | Length of the data that was buffered        |
+| Name   | Type | Notes                                         |
+|--------|------|-----------------------------------------------|
+| type   | u8   | 0x83                                          |
+| index  | u8   | File descriptor that was provided or selected |
+| length | u32  | Length of the data that was buffered          |
 
 ### DATA-BUFFER
 
