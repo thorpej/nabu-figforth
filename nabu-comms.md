@@ -96,24 +96,32 @@ explicitly here.
       This is a name change only; the semantics of these message
       are identical to previous versions.
     * Use the term "file descriptor" rather than "storage slot".
+    * Addition of FILE-READ and FILE-WRITE.
 * Version 0.0 - Initial version
 
 ## Request messages
 
 ### STORAGE-OPEN
 
-Open a URL and assign a storage index to it.  The URL can be relative
+Open a URL and assign a file descriptor to it.  The URL can be relative
 or a file URL to open a local file.  Network adapters may implement
 additional, nonstandard URL schemes.  Relative URLs are interpreted 
 as files.  The flags field can be used to pass additional information
 to the storage handler.  The meaning of the flags is not specified in
 the protocol itself.
 
-The network adapter will attempt to use the storage slot specified by
+The network adapter will attempt to use the file descriptor specified by
 the caller unless the caller specifies 0xff, in which case the network
-adapter will attempt to allocate a storage slot.  If the requested slot
+adapter will attempt to allocate a file descriptor.  If the file descriptor
 is already in-use by another storage object, the STORAGE-OPEN request
 MUST fail.
+
+Each file descriptor shall have an associated file cursor to be used
+with sequential read (FILE-READ) and write (FILE-WRITE) operations.
+This cursor MUST be updated whenever data is read from or written to
+the underlying storage object.  This cursor is unaffected by the
+positional read (FILE-PREAD) and write (FILE-PWRITE) operations.  The
+initial value of the file cursor MUST be zero.
 
 | Name       | Type  | Notes                                                                      |
 |------------|-------|----------------------------------------------------------------------------|
@@ -207,6 +215,71 @@ with it on the network adapter will be freed.
 No response message is returned by the network adapter.  If the server
 receives a slot that is not currently in use by the client, the request
 is simply ignored.
+
+### FILE-READ
+
+Perform a sequential-read of data from network adapter storage.
+
+N.B. The maximum payload length that can be returned to the caller
+is the maximum message length (32767) _minus_ the size of the
+DATA-BUFFER reply message (3) (32767 - 3 -> 32764 bytes).  Servers
+SHOULD return an error for FILE-READ requests whose length field
+exceeds this value.
+
+| Name   | Type | Notes                            |
+|--------|------|----------------------------------|
+| type   | u8   | 0x06                             |
+| index  | u8   | File descriptor to access        |
+| length | u16  | Number of bytes to return        |
+
+Possible responses: DATA-BUFFER, ERROR
+
+The length returned in the DATA-BUFFER response reflects
+the amount of data actually read from the underlying
+storage object.  If the file cursor is beyond the object's
+end-of-file, then the returned length MUST be 0.
+If the read operation would cross the object's end-of-file,
+then the length MUST be the number of bytes read before
+the end-of-file was encountered.
+
+The file cursor associated with the file descriptor MUST
+be updated to reflect the numnber of bytes read from the
+underlying storage object.
+
+### FILE-WRITE
+
+Perform a sequential-write to update data stored in the network
+adapter.  If possible, the underlying storage (file/URL) SHOULD
+be updated as well.
+
+N.B. The maximum payload length that can be sent to the server
+is the maximum message length (32767) _minus_ the size of the
+STORAGE-PUT request message (4) (32767 - 4 -> 32763 bytes).  Servers
+SHOULD return an error for FILE-WRITE requests whose length field
+exceeds this value.
+
+| Name   | Type | Notes                            |
+|--------|------|----------------------------------|
+| type   | u8   | 0x07                             |
+| index  | u8   | File descriptor to access        |
+| length | u16  | Number of bytes to write         |
+| data   | u8*  | Data to update the storage with  |
+
+Possible responses: OK, ERROR
+
+If a write originates at or beyond the underlying storage
+object's end-of-file or therwise crosses the end-of-file,
+then the underlying storage object SHOULD be implicitly
+enlarged to accommodate the write.  For writes that originate
+beyond end-of-file, the region between the old end-of-file and
+the newly-written region MUST be implicitly zero-filled.  If
+a server implementation does not support extending the underlying
+storage object, then the server MUST return an error without
+performing the write operation.
+
+The file cursor associated with the file descriptor MUST
+be updated to reflect the numnber of bytes writtn to the
+underlying storage object.
 
 ### END-PROTOCOL
 
