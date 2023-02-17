@@ -145,7 +145,7 @@ exceeds this value.
 Possible responses: DATA-BUFFER, ERROR
 
 The length returned in the DATA-BUFFER response reflects
-the amount of data actuallty read from the underlying
+the amount of data actually read from the underlying
 storage object.  If the offset is beyond the object's
 end-of-file, then the returned length MUST be 0.
 If the read operation would cross the object's end-of-file,
@@ -161,7 +161,7 @@ be updated as well.
 N.B. The maximum payload length that can be sent to the server
 is the maximum message length (32767) _minus_ the size of the
 STORAGE-PUT request message (8) (32767 - 8 -> 32759 bytes).  Servers
-SHOULD return an error for STORAGE-PUT requests whose length field
+SHOULD return an error for FILE-PWRITE requests whose length field
 exceeds this value.
 
 | Name   | Type | Notes                            |
